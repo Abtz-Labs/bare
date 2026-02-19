@@ -1,0 +1,38 @@
+{
+  "name": "@abtz/bare",
+  "version": "0.1.0",
+  "description": "Atomic zero-downtime deployments to bare VPS servers over SSH. No containers required.",
+  "keywords": [
+    "deployment",
+    "deploy",
+    "atomic deploy",
+    "zero downtime",
+    "vps",
+    "ssh",
+    "nodejs",
+    "php",
+    "saas",
+    "devops"
+  ],
+  "homepage": "https://github.com/abtz-labs/bare",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abtz-labs/bare.git"
+  },
+  "bugs": {
+    "url": "https://github.com/abtz-labs/bare/issues"
+  },
+  "license": "MIT",
+  "author": "Abtz Labs",
+  "type": "module",
+  "bin": {
+    "bare": "./bare.js"
+  },
+  "files": [
+    "bare.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}

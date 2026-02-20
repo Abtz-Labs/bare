@@ -101,14 +101,15 @@ The directory to package for deployment (default: `"."`).
 ### `include`
 Array of file patterns to include in the deployment package. When specified, only matching files are packaged. Supports glob patterns.
 
-**Example**: Include only specific file types
+**Example**: Include only specific file-types
 ```json
 {
   "include": ["*.js", "*.json", "views/*", "public/*"]
 }
 ```
 
-**Note**: When using `include`, remember to add `".*"` if you need hidden files (like `.env.production`).
+> [!NOTE]
+> When using `include`, remember to add `".*"` if you need hidden files (like `.env.production`).
 
 ### `ignore`
 Array of file patterns to exclude from the deployment package (default: `[".git/*"]`). Applied after `include` patterns, allowing fine-grained control.
@@ -120,7 +121,8 @@ Array of file patterns to exclude from the deployment package (default: `[".git/
 }
 ```
 
-**Security Note**: By default, `.env` files are **not** excluded. If your `distDir` contains development secrets (e.g., `.env.local`), add `.env*` or `.env.local` to the ignore list. For production deployments from a build directory (e.g., `./dist`), ensure only production-ready `.env` files are present.
+> [!CAUTION]
+> By default, `.env` files are **not** excluded. If your `distDir` contains development secrets (e.g., `.env.local`), add `.env*` or `.env.local` to the ignore-list. For production deployments from a build directory (e.g., `./dist`), ensure only production-ready `.env` files are present.
 
 ### Combined Usage
 You can use both `include` and `ignore` together for precise control:
@@ -205,8 +207,6 @@ Bare keeps the deployment model aligned with the host filesystem and process man
 
 ---
 
-## License
+Bare Deploy is built and supported by [Abtz Labs](https://abtz.co?ref=Bare+Deploy), the same people behind [Abtz Analytics](https://analytics.abtz.co?ref=Bare+Deploy), [KiwiCart](https://kiwicart.xyz?ref=Bare+Deploy), and others. It's opinionated, FREE, and open-source --distributed under [MIT](./LICENSE) license.
 
 MIT © Abtz Labs
-
-Brought to you by the guys behind [Abtz Analytics](https://analytics.abtz.co?ref=Bare+Deploy), [KiwiCart](https://kiwicart.xyz?ref=Bare+Deploy) and others.

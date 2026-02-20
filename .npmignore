@@ -1,2 +1,4 @@
-.editorconfig
+dist/
 bare.json
+
+.editorconfig

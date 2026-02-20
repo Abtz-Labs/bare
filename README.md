@@ -70,21 +70,69 @@ The files it creates looks like this 👇
 {
   "servers": [
     {
-      "host": "123.45.67.89",
+      "host": "your-server.com",
       "user": "deploy",
       "port": 22,
-      "deployPath": "/var/www/myapp",
-      "tmpPath": "/tmp"
+      "identityFile": "~/.ssh/id_rsa"
     }
   ],
-  "pre": ["npm test", "npm run lint", "npm run build"],
-  "post": ["npm install --production", "pm2 reload ecosystem.config.js"],
+  "deployTo": "/var/www/app",
+  "tmpDir": "/tmp",
+  "distDir": "./dist",
+  "keepReleases": 5,
+  "include": [],
+  "ignore": [".git/*", "*.log"],
+  "preScripts": ["npm run build"],
+  "postScripts": ["pm2 start --env production --update-env"],
   "healthCheck": {
-    "url": "https://myapp.com/health",
-    "timeout": 10000
+    "url": "http://localhost:3000/health",
+    "timeout": 15
   }
 }
 ```
+
+---
+
+## Configuration Options
+
+### `distDir`
+The directory to package for deployment (default: `"."`).
+
+### `include`
+Array of file patterns to include in the deployment package. When specified, only matching files are packaged. Supports glob patterns.
+
+**Example**: Include only specific file types
+```json
+{
+  "include": ["*.js", "*.json", "views/*", "public/*"]
+}
+```
+
+**Note**: When using `include`, remember to add `".*"` if you need hidden files (like `.env.production`).
+
+### `ignore`
+Array of file patterns to exclude from the deployment package (default: `[".git/*"]`). Applied after `include` patterns, allowing fine-grained control.
+
+**Example**: Exclude test files and logs
+```json
+{
+  "ignore": [".git/*", "*.log", "test/*", "*.test.js"]
+}
+```
+
+**Security Note**: By default, `.env` files are **not** excluded. If your `distDir` contains development secrets (e.g., `.env.local`), add `.env*` or `.env.local` to the ignore list. For production deployments from a build directory (e.g., `./dist`), ensure only production-ready `.env` files are present.
+
+### Combined Usage
+You can use both `include` and `ignore` together for precise control:
+
+```json
+{
+  "include": ["*.js", "*.json", "config/*"],
+  "ignore": ["*.test.js", "config/local.json"]
+}
+```
+
+This includes all `.js` and `.json` files plus the `config/` directory, but excludes test files and local config.
 
 ---
 

@@ -210,6 +210,29 @@ function bumpVersion(type = "patch") {
   return newVersion;
 }
 
+function buildZipCommand(distDir, archive, config) {
+  const includePatterns = config.include || [];
+  const ignorePatterns = config.ignore || [".git/*"];
+
+  let zipCmd = `cd ${distDir} && zip -r ../${archive}`;
+
+  if (includePatterns.length > 0) {
+    // If include patterns are specified, only zip those patterns
+    const patterns = includePatterns.join(" ");
+    zipCmd += ` ${patterns}`;
+  } else {
+    zipCmd += ` .`;
+  }
+
+  if (ignorePatterns.length > 0) {
+    // If ignore patterns are specified, attempt to exclude these
+    const excludes = ignorePatterns.map((pattern) => `-x '${pattern}'`).join(" ");
+    zipCmd += ` ${excludes}`;
+  }
+
+  return zipCmd;
+}
+
 // ------------------------------
 // DEPLOY
 // ------------------------------
@@ -229,7 +252,8 @@ async function deploy() {
   const archive = `${releaseId}.zip`;
 
   const distDir = config.distDir || ".";
-  runLocal(`cd ${distDir} && zip -r ../${archive} . -x node_modules/* .git/*`, "Creating deployment package...");
+  const zipCommand = buildZipCommand(distDir, archive, config);
+  runLocal(zipCommand, "Creating deployment package...");
 
   const deployToServer = async (server) => {
     const base = config.deployTo;
@@ -414,6 +438,8 @@ function init() {
     tmpDir: "/tmp",
     distDir: "./dist",
     keepReleases: 5,
+    include: [],
+    ignore: [".git/*", "*.log"],
     preScripts: ["npm run build"],
     postScripts: ["pm2 start --env production --update-env"],
     healthCheck: {
@@ -522,6 +548,14 @@ Options:
   --patch           Bump patch version (default)
   --minor           Bump minor version
   --major           Bump major version
+
+Configuration (bare.json):
+  distDir           Directory to package (default: ".")
+  include           File patterns to include (e.g., ["*.js", "views/*"])
+  ignore            File patterns to exclude (e.g., [".git/*", "*.log"])
+                    Note: include and ignore can be used together
+
+For full documentation, visit: https://github.com/abtz-labs/bare
         `);
     }
   } catch (err) {

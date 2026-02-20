@@ -296,6 +296,8 @@ async function deploy() {
 
   if (!options.dryRun) fs.unlinkSync(archive);
 
+  log("success", `Deploy ID: ${releaseId}`);
+
   const totalSeconds = (Date.now() - startTime) / 1000;
   let duration;
 
@@ -487,7 +489,7 @@ function cleanup() {
       case "deploy":
         await deploy();
         break;
-      case "releases":
+      case "list":
         listReleases();
         break;
       case "rollback":
@@ -504,12 +506,12 @@ function cleanup() {
  ██████  ███████ ██████  █████
  ██   ██ ██   ██ ██   ██ ██
  ██████  ██   ██ ██   ██ ███████
- by Abtz Labs
+ Deploy tool by Abtz Labs
 
 Commands:
   init              Create bare.json config file
   deploy            Run deployment
-  releases          List releases
+  list              List releases
   rollback <id>     Rollback to release
   cleanup           Remove old releases
 

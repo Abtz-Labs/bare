@@ -1,10 +1,17 @@
-# BARE
+```
+  ██████   █████  ██████  ███████
+  ██   ██ ██   ██ ██   ██ ██
+  ██████  ███████ ██████  █████
+  ██   ██ ██   ██ ██   ██ ██
+  ██████  ██   ██ ██   ██ ███████
+  Deploy tool by Abtz Labs
+```
 
 Atomic zero-downtime deployments to **bare VPS servers** over SSH.
 
-No containers.
-No agents.
-No orchestration layers.
+- No containers.
+- No agents.
+- No orchestration layers.
 
 Just disciplined releases.
 
@@ -14,13 +21,12 @@ Just disciplined releases.
 
 Bare is built for developers who:
 
-- Deploy directly to VPS instances
-- Use Node.js or PHP applications
+- Deploy Node.js apps directly to VPS instances
 - Want atomic releases with instant rollback
 - Prefer SSH over platform abstraction
 - Value operational clarity over orchestration complexity
 
-Inspired by the simplicity of Kamal, but designed for host-native deployments.
+Inspired by the simplicity of [Kamal](https://kamal-deploy.org/), but designed for host-native deployments.
 
 ---
 
@@ -45,21 +51,20 @@ Inspired by the simplicity of Kamal, but designed for host-native deployments.
 ## Installation
 
 ```bash
-npm install -g @abtz/bare
+npm install -g bare-deploy
 ```
 
 ---
 
 ## Quick Start
 
-In your project root:
+In your project root, run the following command to generate the `bare.json` configuration file.:
 
 ```sh
 bare init
 ```
 
-This generates a `bare.json` configuration file.
-Example:
+The files it creates looks like this 👇
 
 ```json
 {
@@ -83,7 +88,7 @@ Example:
 
 ---
 
-## Deploy
+## How to Deploy
 
 ```sh
 bare deploy [--patch | --minor | --major] [--json] [--dry-run]
@@ -92,40 +97,15 @@ bare deploy [--patch | --minor | --major] [--json] [--dry-run]
 ### Options:
 
 ```
---dry-run
---json
---patch
---minor
---major
+  --dry-run         Simulate execution
+  --json            JSON logging
+  --sequential      Deploy server-by-server
+  --patch           Bump patch version (default)
+  --minor           Bump minor version
+  --major           Bump major version
 ```
 
----
-
-## Rollback
-
-```sh
-bare rollback [id]
-```
-
----
-
-## List Releases
-
-```sh
-bare releases
-```
-
----
-
-## Clean-up Old Releases
-
-```sh
-bare cleanup
-```
-
----
-
-## How It Works
+### How It Works
 
 - Runs local pre-deploy scripts
 - Bumps package.json version
@@ -137,6 +117,30 @@ bare cleanup
 - Optionally validates health endpoint
 - Releases lock
 - Rollback simply repoints the symlink.
+
+---
+
+## How to Rollback
+
+```sh
+bare rollback [id]
+```
+
+---
+
+## How to List Releases
+
+```sh
+bare list
+```
+
+---
+
+## How to Clean-up Old Releases
+
+```sh
+bare cleanup
+```
 
 ---
 
@@ -156,3 +160,5 @@ Bare keeps the deployment model aligned with the host filesystem and process man
 ## License
 
 MIT © Abtz Labs
+
+Brought to you by the guys behind [Abtz Analytics](https://analytics.abtz.co?ref=Bare+Deploy), [KiwiCart](https://kiwicart.xyz?ref=Bare+Deploy) and others.

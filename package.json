@@ -1,5 +1,5 @@
 {
-  "name": "@abtz/bare",
+  "name": "bare-deploy",
   "version": "0.1.0",
   "description": "Atomic zero-downtime deployments to bare VPS servers over SSH. No containers required.",
   "keywords": [

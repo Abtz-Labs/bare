@@ -175,6 +175,8 @@ function scpTo(server, localFile, remotePath) {
 function generateReleaseId() {
   const now = new Date();
 
+  // Use UTC timestamp to avoid conflicts when deploying from different timezones
+  // Format: YYYYMMDDHHmmss (e.g., 20260220162341)
   return now
     .toISOString()
     .replace(/[-:T.]/g, "")
@@ -279,8 +281,18 @@ async function deploy() {
         "Extracting deployment package",
       );
 
+      // Capture previous release for potential rollback
+      const previousRelease = runSSH(
+        server,
+        `readlink ${base}/current 2>/dev/null || echo ""`,
+        "Capturing previous release",
+      );
+
+      // Update symlink BEFORE running postScripts so they operate on the new release
+      runSSH(server, `ln -sfn ${releaseDir} ${base}/current`, "Activating new release");
+
       for (const script of config.postScripts || []) {
-        runSSH(server, `cd ${releaseDir} && ${script}`, "Running post-deployment script");
+        runSSH(server, `cd ${base}/current && ${script}`, "Running post-deployment script");
       }
 
       if (config.healthCheck?.url) {
@@ -294,7 +306,6 @@ async function deploy() {
         );
       }
 
-      runSSH(server, `ln -sfn ${releaseDir} ${base}/current`, "Activating new release");
       runSSH(server, `rm -f ${lockFile}`, "Releasing deployment lock");
 
       log("success", `Deploy successful!`);
@@ -302,9 +313,57 @@ async function deploy() {
       log("error", `Deploy failed on ${server.host}`);
 
       try {
+        // Attempt rollback if there was a previous release
+        if (previousRelease && previousRelease.trim() !== "") {
+          log("warn", "Attempting rollback to previous release...");
+
+          // Revert symlink to previous release
+          runSSH(server, `ln -sfn ${previousRelease} ${base}/current`, "Reverting symlink to previous release");
+
+          // Re-run postScripts to restart the old version
+          if (config.postScripts && config.postScripts.length > 0) {
+            log("info", "Restarting previous release...");
+            for (const script of config.postScripts) {
+              try {
+                runSSH(server, `cd ${base}/current && ${script}`, "Running post-script for previous release");
+              } catch (scriptErr) {
+                log("warn", `Failed to run post-script during rollback: ${script}`);
+              }
+            }
+          }
+
+          // Health check the previous release to confirm it's healthy
+          if (config.healthCheck?.url) {
+            try {
+              runSSH(
+                server,
+                `
+                timeout ${config.healthCheck.timeout || 15} \
+                curl -f ${config.healthCheck.url}
+              `,
+                "Verifying previous release health",
+              );
+              log("success", "Rollback successful - previous release is healthy");
+            } catch (healthErr) {
+              log("error", "WARNING: Previous release health check failed after rollback!");
+            }
+          } else {
+            log("success", "Rollback completed");
+          }
+        } else {
+          log("error", "First deployment failed - no previous release to revert to");
+          log("info", "Check your application logs and configuration, then try deploying again");
+        }
+
+        // Clean up failed release directory
         runSSH(server, `rm -rf ${releaseDir} || true`, "Cleaning up failed deployment");
         runSSH(server, `rm -f ${lockFile} || true`, "Releasing deployment lock");
-      } catch {}
+      } catch (rollbackErr) {
+        log("error", "Rollback failed - manual intervention may be required");
+        try {
+          runSSH(server, `rm -f ${lockFile} || true`, "Releasing deployment lock");
+        } catch {}
+      }
 
       process.exit(1);
     }

@@ -549,12 +549,6 @@ Options:
   --minor           Bump minor version
   --major           Bump major version
 
-Configuration (bare.json):
-  distDir           Directory to package (default: ".")
-  include           File patterns to include (e.g., ["*.js", "views/*"])
-  ignore            File patterns to exclude (e.g., [".git/*", "*.log"])
-                    Note: include and ignore can be used together
-
 For full documentation, visit: https://github.com/abtz-labs/bare
         `);
     }

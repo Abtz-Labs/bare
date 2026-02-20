@@ -16,6 +16,9 @@ import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
 
+const pkgPath = path.join(process.cwd(), "package.json");
+const pkg = JSON.parse(fs.readFileSync(pkgPath));
+
 // ------------------------------
 // CLI ARGUMENTS
 // ------------------------------
@@ -28,6 +31,7 @@ const options = {
   json: args.includes("--json"),
   parallel: !args.includes("--sequential"),
   versionBump: args.includes("--major") ? "major" : args.includes("--minor") ? "minor" : "patch",
+  queryVersion: args.includes("--version") || args.includes("-v")
 };
 
 // ------------------------------
@@ -184,8 +188,6 @@ function generateReleaseId() {
 }
 
 function bumpVersion(type = "patch") {
-  const pkgPath = path.join(process.cwd(), "package.json");
-  const pkg = JSON.parse(fs.readFileSync(pkgPath));
   const parts = pkg.version.split(".").map((n) => parseInt(n));
 
   if (type === "major") {
@@ -566,6 +568,11 @@ function cleanup() {
 // ------------------------------
 
 (async () => {
+  if (options.queryVersion) {
+    console.log(`Bare Deploy v${pkg.version}`);
+    return;
+  }
+
   try {
     switch (command) {
       case "init":
@@ -591,7 +598,7 @@ function cleanup() {
  ██████  ███████ ██████  █████
  ██   ██ ██   ██ ██   ██ ██
  ██████  ██   ██ ██   ██ ███████
- Deploy tool by Abtz Labs
+ Deploy tool by Abtz Labs (v${pkg.version})
 
 Commands:
   init              Create bare.json config file

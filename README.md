@@ -7,6 +7,10 @@
   Deploy tool by Abtz Labs
 ```
 
+[![npm version](https://img.shields.io/npm/v/bare-deploy.svg)](https://www.npmjs.com/package/bare-deploy)
+[![npm downloads](https://img.shields.io/npm/dt/bare-deploy.svg)](https://www.npmjs.com/package/bare-deploy)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Atomic zero-downtime deployments to **bare VPS servers** over SSH.
 
 - No containers.
@@ -96,12 +100,15 @@ The files it creates looks like this 👇
 ## Configuration Options
 
 ### `distDir`
+
 The directory to package for deployment (default: `"."`).
 
 ### `include`
+
 Array of file patterns to include in the deployment package. When specified, only matching files are packaged. Supports glob patterns.
 
 **Example**: Include only specific file-types
+
 ```json
 {
   "include": ["*.js", "*.json", "views/*", "public/*"]
@@ -112,9 +119,11 @@ Array of file patterns to include in the deployment package. When specified, onl
 > When using `include`, remember to add `".*"` if you need hidden files (like `.env.production`).
 
 ### `ignore`
+
 Array of file patterns to exclude from the deployment package (default: `[".git/*"]`). Applied after `include` patterns, allowing fine-grained control.
 
 **Example**: Exclude test files and logs
+
 ```json
 {
   "ignore": [".git/*", "*.log", "test/*", "*.test.js"]
@@ -125,6 +134,7 @@ Array of file patterns to exclude from the deployment package (default: `[".git/
 > By default, `.env` files are **not** excluded. If your `distDir` contains development secrets (e.g., `.env.local`), add `.env*` or `.env.local` to the ignore-list. For production deployments from a build directory (e.g., `./dist`), ensure only production-ready `.env` files are present.
 
 ### Combined Usage
+
 You can use both `include` and `ignore` together for precise control:
 
 ```json

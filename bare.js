@@ -539,14 +539,14 @@ function listReleases() {
       if (options.dryRun) {
         log("info", "Listing releases...");
         log("success", `Releases on ${server.host}:`);
-        console.log("Example-1\nExample-2\nExample-3");
+        console.log("20260220123456-v1.0.1\n20260220150000-v1.0.2\n20260220162341-v1.0.3");
 
         return;
       }
 
       const releases = runSSH(
         server,
-        `ls -1 ${server.deployTo}/releases 2>/dev/null || echo "No releases found"`,
+        `ls -1 ${server.deployTo}/releases 2>/dev/null | grep -v '^current$' || echo "No releases found"`,
         "Listing releases",
       );
 

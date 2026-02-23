@@ -271,7 +271,7 @@ async function deploy() {
 
     // Create zip for this server's distDir
     const archive = `${releaseId}.${server.host}.zip`;
-    const distDir = server.distDir || ".";
+    const distDir = server.distDir || "./dist";
     const serverConfig = {
       include: server.include ?? config.include ?? [],
       ignore: server.ignore ?? config.ignore ?? [".git/*"],
@@ -282,7 +282,7 @@ async function deploy() {
     const base = server.deployTo;
     const releaseBase = `${base}/releases`;
     const releaseDir = `${releaseBase}/${releaseId}`;
-    const lockFile = `${base}/.deploy.lock`;
+    const lockFile = `${base}/.bare-deploy.lock`;
 
     log("info", `Deploying to ${server.host}...`);
 
@@ -291,8 +291,11 @@ async function deploy() {
       runSSH(server, `if [ -f ${lockFile} ]; then echo "Deploy locked"; exit 1; fi`, "Checking deployment lock");
       runSSH(server, `touch ${lockFile}`, "Acquiring deployment lock");
 
-      // Handle webroot migration (first deploy: if webroot is a directory, backup it)
+      // Create release directory BEFORE uploading
+      runSSH(server, `mkdir -p ${releaseDir}`, "Creating release directory");
+
       if (server.webroot) {
+        // Handle webroot migration (first deploy: if webroot is a directory, backup it)
         const isDir = runSSH(
           server,
           `[ -d "${server.webroot}" ] && echo "dir" || echo "not-dir"`,
@@ -308,8 +311,6 @@ async function deploy() {
       runSSH(
         server,
         `
-        mkdir -p ${base}/releases &&
-        mkdir -p ${releaseDir} &&
         unzip -q ${releaseDir}/${archive} -d ${releaseDir} &&
         rm -f ${releaseDir}/${archive}
       `,
@@ -336,6 +337,7 @@ async function deploy() {
           // Subsequent deploy: copy from previous release
           const previousRelease = previousWebrootTarget.split("/").pop();
           const prevReleaseDir = `${releaseBase}/${previousRelease}`;
+
           copyWellKnown(server, prevReleaseDir, releaseDir);
         } else if (backupExists === "yes") {
           // First deploy: copy from backup
@@ -356,9 +358,7 @@ async function deploy() {
 
       // Handle webroot symlink
       if (server.webroot) {
-        // Remove old webroot if exists (symlink or directory)
         runSSH(server, `rm -rf "${server.webroot}" 2>/dev/null || true`, "Removing old webroot");
-        // Create new webroot symlink
         runSSH(server, `ln -sfn ${releaseBase}/current "${server.webroot}"`, "Creating webroot symlink");
       }
 
@@ -397,7 +397,7 @@ async function deploy() {
       }
 
       // Delete local zip file
-      if (fs.existsSync(archive)) {
+      if (!options.dryRun && fs.existsSync(archive)) {
         fs.unlinkSync(archive);
         log("info", `Deleted local archive ${archive}`);
       }
@@ -463,6 +463,7 @@ async function deploy() {
         runSSH(server, `rm -f ${lockFile} || true`, "Releasing deployment lock");
       } catch (rollbackErr) {
         log("error", "Rollback failed - manual intervention may be required");
+
         try {
           runSSH(server, `rm -f ${lockFile} || true`, "Releasing deployment lock");
         } catch {}
@@ -489,10 +490,12 @@ async function deploy() {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = Math.floor(totalSeconds % 60);
+
     duration = `${hours}h ${minutes}m ${seconds}s`;
   } else if (totalSeconds >= 60) {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = Math.floor(totalSeconds % 60);
+
     duration = `${minutes}m ${seconds}s`;
   } else {
     duration = `${totalSeconds.toFixed(3)}s`;
@@ -514,6 +517,7 @@ function listReleases() {
         log("info", "Listing releases...");
         log("success", `Releases on ${server.host}:`);
         console.log("Example-1\nExample-2\nExample-3");
+
         return;
       }
 
@@ -539,18 +543,27 @@ function listReleases() {
 // ROLLBACK
 // ------------------------------
 
-function rollback(version) {
+async function rollback(version) {
   if (!version) {
     log("error", "Rollback requires release id.");
     process.exit(1);
   }
 
   const config = loadConfig();
-  let hasErrors = false;
 
-  config.servers.forEach((server) => {
+  const rollbackServer = async (server) => {
     const base = server.deployTo;
     const releaseBase = `${base}/releases`;
+
+    if (options.dryRun) {
+      log("info", `Rolling back to ${version}...`);
+      if (server.webroot) {
+        log("info", "Updating webroot symlink...");
+      }
+      log("info", "Running start script for rolled back release...");
+      log("success", `Rollback completed on ${server.host}`);
+      return;
+    }
 
     try {
       runSSH(
@@ -561,7 +574,6 @@ function rollback(version) {
         `Rolling back to ${version}`,
       );
 
-      // Update webroot symlink if defined
       if (server.webroot) {
         runSSH(
           server,
@@ -582,15 +594,19 @@ function rollback(version) {
       log("success", `Rollback completed on ${server.host}`);
     } catch (err) {
       log("error", `Release ${version} may not exist on ${server.host}`);
-      hasErrors = true;
+      throw err;
     }
-  });
+  };
 
-  if (hasErrors) {
-    process.exit(1);
+  if (options.parallel) {
+    await Promise.all(config.servers.map(rollbackServer));
   } else {
-    log("success", `Rolled back to ${version}`);
+    for (const server of config.servers) {
+      await rollbackServer(server);
+    }
   }
+
+  log("success", `Rolled back to ${version}`);
 }
 
 // ------------------------------
@@ -639,13 +655,11 @@ function init() {
 // CLEANUP
 // ------------------------------
 
-function cleanup() {
+async function cleanup() {
   const config = loadConfig();
-  let hasErrors = false;
 
-  config.servers.forEach((server) => {
-    try {
-      // First, list releases to be removed
+  const cleanupServer = async (server) => {
+    if (options.dryRun) {
       const releasesToRemove = runSSH(
         server,
         `
@@ -661,8 +675,32 @@ function cleanup() {
         releases.forEach((release) => {
           log("info", `  - ${release}`);
         });
+        log("info", "Cleaning up old releases...");
+      } else {
+        log("info", `No old releases to clean up on ${server.host}`);
+      }
+      log("success", `Cleanup completed on ${server.host}`);
+      return;
+    }
 
-        // Now remove them
+    try {
+      const releasesToRemove = runSSH(
+        server,
+        `
+        cd ${server.deployTo}/releases &&
+        ls -1t | tail -n +${config.keepReleases + 1}
+      `,
+        "Finding old releases",
+      );
+
+      if (releasesToRemove && releasesToRemove.trim()) {
+        const releases = releasesToRemove.trim().split("\n");
+
+        log("info", `Removing ${releases.length} old release${releases.length > 1 ? "s" : ""} on ${server.host}:`);
+        releases.forEach((release) => {
+          log("info", `  - ${release}`);
+        });
+
         runSSH(
           server,
           `
@@ -676,13 +714,19 @@ function cleanup() {
         log("info", `No old releases to clean up on ${server.host}`);
       }
     } catch (err) {
-      hasErrors = true;
+      throw err;
     }
-  });
+  };
 
-  if (!hasErrors) {
-    log("success", "Cleanup complete.");
+  if (options.parallel) {
+    await Promise.all(config.servers.map(cleanupServer));
+  } else {
+    for (const server of config.servers) {
+      await cleanupServer(server);
+    }
   }
+
+  log("success", "Cleanup complete.");
 }
 
 // ------------------------------

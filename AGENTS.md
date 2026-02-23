@@ -69,7 +69,7 @@ This is a simple, dependency-free CLI tool. Keep code minimal and readable. Avoi
 
 ### File Organization
 
-- Single-file CLI: `bare.js` (~630 lines)
+- Single-file CLI: `bare.js`
 - Configuration: `bare.config.json`
 - Keep functions grouped by concern with clear section comments:
 
@@ -214,3 +214,4 @@ Before adding any npm dependency:
 - Test both parallel and sequential deployment modes
 - Verify rollback functionality
 - Check error messages are user-friendly and secure
+- Test webroot functionality (if modified) with Let's Encrypt `.well-known` preservation

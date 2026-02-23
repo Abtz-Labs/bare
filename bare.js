@@ -690,7 +690,7 @@ async function cleanup() {
         server,
         `
         cd ${server.deployTo}/releases &&
-        ls -1t | tail -n +${config.keepReleases + 1}
+        ls -1 | sort -r | tail -n +${config.keepReleases + 1}
       `,
         "Finding old releases",
       );
@@ -714,7 +714,7 @@ async function cleanup() {
         server,
         `
         cd ${server.deployTo}/releases &&
-        ls -1t | tail -n +${config.keepReleases + 1}
+        ls -1 | sort -r | tail -n +${config.keepReleases + 1}
       `,
         "Finding old releases",
       );
@@ -731,7 +731,7 @@ async function cleanup() {
           server,
           `
           cd ${server.deployTo}/releases &&
-          ls -1t | tail -n +${config.keepReleases + 1} | xargs -r rm -rf
+          ls -1 | sort -r | tail -n +${config.keepReleases + 1} | xargs -r rm -rf
         `,
           "Cleaning up old releases",
         );

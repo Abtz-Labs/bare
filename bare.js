@@ -259,6 +259,7 @@ async function deploy() {
   const config = loadConfig();
   const startTime = Date.now();
 
+  const originalVersion = pkg.version;
   const version = bumpVersion(options.versionBump);
   const releaseId = `${generateReleaseId()}-${version}`;
 
@@ -292,7 +293,11 @@ async function deploy() {
 
       // Handle webroot migration (first deploy: if webroot is a directory, backup it)
       if (server.webroot) {
-        const isDir = runSSH(server, `[ -d "${server.webroot}" ] && echo "dir" || echo "not-dir"`, "Checking webroot type");
+        const isDir = runSSH(
+          server,
+          `[ -d "${server.webroot}" ] && echo "dir" || echo "not-dir"`,
+          "Checking webroot type",
+        );
         if (isDir === "dir") {
           runSSH(server, `mv "${server.webroot}" "${server.webroot}.bak"`, "Backing up original webroot");
         }
@@ -384,6 +389,19 @@ async function deploy() {
     } catch (err) {
       log("error", `Deploy failed on ${server.host}`);
 
+      // Rollback version in package.json
+      if (!options.dryRun) {
+        pkg.version = originalVersion;
+        fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+        log("info", `Rolled back version to ${originalVersion}`);
+      }
+
+      // Delete local zip file
+      if (fs.existsSync(archive)) {
+        fs.unlinkSync(archive);
+        log("info", `Deleted local archive ${archive}`);
+      }
+
       try {
         // Attempt rollback if there was a previous release
         if (previousRelease && previousRelease.trim() !== "") {
@@ -407,7 +425,11 @@ async function deploy() {
           // Re-run startScript for rollback
           if (server.startScript) {
             try {
-              runSSH(server, `cd ${releaseBase}/current && ${server.startScript}`, "Running start script for previous release");
+              runSSH(
+                server,
+                `cd ${releaseBase}/current && ${server.startScript}`,
+                "Running start script for previous release",
+              );
             } catch (scriptErr) {
               log("warn", `Failed to run start script during rollback: ${server.startScript}`);
             }
@@ -541,7 +563,11 @@ function rollback(version) {
 
       // Update webroot symlink if defined
       if (server.webroot) {
-        runSSH(server, `rm -rf "${server.webroot}" 2>/dev/null || true && ln -sfn ${releaseBase}/current "${server.webroot}"`, "Updating webroot symlink");
+        runSSH(
+          server,
+          `rm -rf "${server.webroot}" 2>/dev/null || true && ln -sfn ${releaseBase}/current "${server.webroot}"`,
+          "Updating webroot symlink",
+        );
       }
 
       runSSH(
@@ -697,7 +723,7 @@ function cleanup() {
  Deploy tool by Abtz Labs (v${pkg.version})
 
 Commands:
-  init              Create bare.config.json config file
+  init              Create bare.config.json file
   deploy            Run deployment
   list              List releases
   rollback <id>     Rollback to release

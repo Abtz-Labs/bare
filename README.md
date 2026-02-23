@@ -39,6 +39,7 @@ Inspired by the simplicity of [Kamal](https://kamal-deploy.org/), but designed f
 - Atomic symlink-based releases
 - Zero-downtime cutovers
 - Parallel multi-server deploy
+- Per-server configuration (different distDirs for different servers)
 - SSH key authentication (no password prompts)
 - Configurable pre & post hooks
 - Automatic version bump
@@ -49,6 +50,7 @@ Inspired by the simplicity of [Kamal](https://kamal-deploy.org/), but designed f
 - Optional JSON logging
 - Rollback support
 - Release pruning
+- Webroot support for static sites with Let's Encrypt preservation
 
 ---
 
@@ -62,7 +64,7 @@ npm install -g bare-deploy
 
 ## Quick Start
 
-In your project root, run the following command to generate the `bare.json` configuration file.:
+In your project root, run the following command to generate the `bare.config.json` configuration file.:
 
 ```sh
 bare init
@@ -77,17 +79,20 @@ The files it creates looks like this 👇
       "host": "your-server.com",
       "user": "deploy",
       "port": 22,
-      "identityFile": "~/.ssh/id_rsa"
+      "identityFile": "~/.ssh/id_rsa",
+      "distDir": "./dist",
+      "deployTo": "/var/www/app",
+      "webroot": "",
+      "include": [],
+      "ignore": [".git/*"],
+      "preScripts": [],
+      "postScripts": [],
+      "startScript": "pm2 restart --env production --update-env"
     }
   ],
-  "deployTo": "/var/www/app",
-  "tmpDir": "/tmp",
-  "distDir": "./dist",
   "keepReleases": 5,
   "include": [],
-  "ignore": [".git/*", "*.log"],
-  "preScripts": ["npm run build"],
-  "postScripts": ["pm2 start --env production --update-env"],
+  "ignore": [".git/*"],
   "healthCheck": {
     "url": "http://localhost:3000/health",
     "timeout": 15
@@ -95,20 +100,69 @@ The files it creates looks like this 👇
 }
 ```
 
+> [!NOTE]
+> Server-specific options (`distDir`, `deployTo`, `webroot`, `include`, `ignore`, `preScripts`, `postScripts`, `startScript`) allow deploying different parts of your project to different servers.
+
 ---
 
 ## Configuration Options
 
-### `distDir`
+### Server-Specific Options
+
+Each server in the `servers` array can have its own configuration:
+
+```json
+{
+  "servers": [
+    {
+      "host": "server.com",
+      "user": "deploy",
+      "port": 22,
+      "identityFile": "~/.ssh/id_rsa",
+      "distDir": "./dist",
+      "deployTo": "/var/www/app",
+      "webroot": "/var/www/app/public_html",
+      "preScripts": [],
+      "postScripts": [],
+      "startScript": "pm2 restart --env production --update-env"
+    }
+  ]
+}
+```
+
+#### `servers[].distDir`
 
 The directory to package for deployment (default: `"."`).
 
-### `include`
+#### `servers[].deployTo`
 
-Array of file patterns to include in the deployment package. When specified, only matching files are packaged. Supports glob patterns.
+The base path on the server where deployments are stored. Creates a `releases/` subfolder with timestamped versions.
 
-**Example**: Include only specific file-types
+#### `servers[].webroot` (per server, optional)
 
+Path to the web server's document root. When set:
+
+- On first deploy: backs up existing `webroot` to `{webroot}.bak`, then creates symlink
+- Automatically copies `.well-known/` (Let's Encrypt) from previous deployment
+- Creates symlink: `webroot` → `releases/current`
+
+#### `servers[].preScripts`
+
+Array of commands to run locally before building the deployment package.
+
+#### `servers[].postScripts`
+
+Array of commands to run on the server after deployment but before switching the symlink.
+
+#### `servers[].startScript`
+
+Command to run after symlink switch. Useful for process managers like PM2.
+
+#### `servers[].include`
+
+Array of file patterns to include in the deployment package for this server. When specified, only matching files are packaged. Supports glob patterns. Falls back to global `include` if not set.
+
+**Example**:
 ```json
 {
   "include": ["*.js", "*.json", "views/*", "public/*"]
@@ -118,33 +172,39 @@ Array of file patterns to include in the deployment package. When specified, onl
 > [!NOTE]
 > When using `include`, remember to add `".*"` if you need hidden files (like `.env.production`).
 
-### `ignore`
+#### `servers[].ignore`
 
-Array of file patterns to exclude from the deployment package (default: `[".git/*"]`). Applied after `include` patterns, allowing fine-grained control.
+Array of file patterns to exclude from the deployment package for this server (default: `[".git/*"]`). Applied after `include` patterns. Falls back to global `ignore` if not set.
 
-**Example**: Exclude test files and logs
-
+**Example**:
 ```json
 {
   "ignore": [".git/*", "*.log", "test/*", "*.test.js"]
 }
 ```
 
-> [!CAUTION]
-> By default, `.env` files are **not** excluded. If your `distDir` contains development secrets (e.g., `.env.local`), add `.env*` or `.env.local` to the ignore-list. For production deployments from a build directory (e.g., `./dist`), ensure only production-ready `.env` files are present.
+### Global Options
 
-### Combined Usage
+#### `include`
 
-You can use both `include` and `ignore` together for precise control:
+Global array of file patterns to include in the deployment package. Used as fallback when not defined per-server.
 
-```json
-{
-  "include": ["*.js", "*.json", "config/*"],
-  "ignore": ["*.test.js", "config/local.json"]
-}
-```
+#### `ignore`
 
-This includes all `.js` and `.json` files plus the `config/` directory, but excludes test files and local config.
+Global array of file patterns to exclude from the deployment package (default: `[".git/*"]`). Used as fallback when not defined per-server.
+
+#### `keepReleases`
+
+#### `keepReleases`
+
+Number of releases to keep on the server (default: `5`).
+
+#### `healthCheck`
+
+Health check configuration:
+
+- `url`: URL to check after deployment
+- `timeout`: Seconds to wait (default: `15`)
 
 ---
 

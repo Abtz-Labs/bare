@@ -271,7 +271,11 @@ async function deploy() {
     // Create zip for this server's distDir
     const archive = `${releaseId}.${server.host}.zip`;
     const distDir = server.distDir || ".";
-    const zipCommand = buildZipCommand(distDir, archive, config);
+    const serverConfig = {
+      include: server.include ?? config.include ?? [],
+      ignore: server.ignore ?? config.ignore ?? [".git/*"],
+    };
+    const zipCommand = buildZipCommand(distDir, archive, serverConfig);
     runLocal(zipCommand, `Creating deployment package for ${server.host}...`);
 
     const base = server.deployTo;
@@ -585,12 +589,16 @@ function init() {
         distDir: "./dist",
         deployTo: "/var/www/app",
         webroot: "",
+        include: [],
+        ignore: [".git/*"],
         preScripts: [],
         postScripts: [],
         startScript: "pm2 restart --env production --update-env",
       },
     ],
     keepReleases: 5,
+    include: [],
+    ignore: [".git/*"],
     healthCheck: {
       url: "http://localhost:3000/health",
       timeout: 15,

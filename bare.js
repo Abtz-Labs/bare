@@ -237,6 +237,20 @@ function buildZipCommand(distDir, archive, config) {
   return zipCmd;
 }
 
+function copyWellKnown(server, sourceDir, targetDir) {
+  const cmd = `
+    if [ -d "${sourceDir}/.well-known" ]; then
+      mkdir -p "${targetDir}/.well-known" &&
+      cp -r "${sourceDir}/.well-known/"* "${targetDir}/.well-known/" 2>/dev/null || echo "Warning: Failed to copy .well-known"
+    fi
+  `;
+  try {
+    runSSH(server, cmd, "Copying .well-known for Let's Encrypt");
+  } catch (err) {
+    log("warn", `.well-known copy failed, continuing anyway: ${err.message}`);
+  }
+}
+
 // ------------------------------
 // DEPLOY
 // ------------------------------
@@ -272,6 +286,14 @@ async function deploy() {
       runSSH(server, `if [ -f ${lockFile} ]; then echo "Deploy locked"; exit 1; fi`, "Checking deployment lock");
       runSSH(server, `touch ${lockFile}`, "Acquiring deployment lock");
 
+      // Handle webroot migration (first deploy: if webroot is a directory, backup it)
+      if (server.webroot) {
+        const isDir = runSSH(server, `[ -d "${server.webroot}" ] && echo "dir" || echo "not-dir"`, "Checking webroot type");
+        if (isDir === "dir") {
+          runSSH(server, `mv "${server.webroot}" "${server.webroot}.bak"`, "Backing up original webroot");
+        }
+      }
+
       scpTo(server, archive, `${releaseDir}/${archive}`);
 
       runSSH(
@@ -285,6 +307,34 @@ async function deploy() {
         "Extracting deployment package",
       );
 
+      // Copy .well-known for Let's Encrypt before switching
+      if (server.webroot) {
+        // Get previous webroot target
+        const previousWebrootTarget = runSSH(
+          server,
+          `[ -L "${server.webroot}" ] && readlink -f "${server.webroot}" || echo ""`,
+          "Getting previous webroot target",
+        );
+
+        // Check for backup from first deploy
+        const backupExists = runSSH(
+          server,
+          `[ -d "${server.webroot}.bak" ] && echo "yes" || echo "no"`,
+          "Checking for webroot backup",
+        );
+
+        if (previousWebrootTarget && previousWebrootTarget.includes(releaseBase)) {
+          // Subsequent deploy: copy from previous release
+          const previousRelease = previousWebrootTarget.split("/").pop();
+          const prevReleaseDir = `${releaseBase}/${previousRelease}`;
+          copyWellKnown(server, prevReleaseDir, releaseDir);
+        } else if (backupExists === "yes") {
+          // First deploy: copy from backup
+          copyWellKnown(server, `${server.webroot}.bak`, releaseDir);
+        }
+        // If neither exists, skip silently
+      }
+
       // Capture previous release for potential rollback
       const previousRelease = runSSH(
         server,
@@ -294,6 +344,14 @@ async function deploy() {
 
       // Update symlink BEFORE running postScripts so they operate on the new release
       runSSH(server, `ln -sfn ${releaseDir} ${releaseBase}/current`, "Activating new release");
+
+      // Handle webroot symlink
+      if (server.webroot) {
+        // Remove old webroot if exists (symlink or directory)
+        runSSH(server, `rm -rf "${server.webroot}" 2>/dev/null || true`, "Removing old webroot");
+        // Create new webroot symlink
+        runSSH(server, `ln -sfn ${releaseBase}/current "${server.webroot}"`, "Creating webroot symlink");
+      }
 
       for (const script of server.postScripts || []) {
         runSSH(server, `cd ${releaseBase}/current && ${script}`, "Running post-deployment script");
@@ -472,12 +530,25 @@ function rollback(version) {
       runSSH(
         server,
         `
-        ln -sfn ${releaseBase}/${version} ${releaseBase}/current &&
-        cd ${releaseBase}/current &&
-        ${config.restartCommand ?? "echo 'No restart needed"}
+        ln -sfn ${releaseBase}/${version} ${releaseBase}/current
       `,
         `Rolling back to ${version}`,
       );
+
+      // Update webroot symlink if defined
+      if (server.webroot) {
+        runSSH(server, `rm -rf "${server.webroot}" 2>/dev/null || true && ln -sfn ${releaseBase}/current "${server.webroot}"`, "Updating webroot symlink");
+      }
+
+      runSSH(
+        server,
+        `
+        cd ${releaseBase}/current &&
+        ${server.startScript ?? "echo 'No restart script"}
+      `,
+        "Running start script for rolled back release",
+      );
+
       log("success", `Rollback completed on ${server.host}`);
     } catch (err) {
       log("error", `Release ${version} may not exist on ${server.host}`);
@@ -513,6 +584,7 @@ function init() {
         identityFile: "~/.ssh/id_rsa",
         distDir: "./dist",
         deployTo: "/var/www/app",
+        webroot: "",
         preScripts: [],
         postScripts: [],
         startScript: "pm2 restart --env production --update-env",

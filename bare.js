@@ -60,14 +60,21 @@ function log(level, message, meta = {}) {
     return;
   }
 
-  let color = colors.reset;
+  let color;
 
-  if (level === "success") {
-    color = colors.green;
-  } else if (level === "error") {
-    color = colors.red;
-  } else if (level === "warn") {
-    color = colors.yellow;
+  switch (level) {
+    case "success":
+      color = colors.green;
+      break;
+    case "error":
+      color = colors.red;
+      break;
+    case "warn":
+      color = colors.yellow;
+      break;
+    default:
+      color = colors.reset;
+      break;
   }
 
   console.log(`${color}${message}${colors.reset}`);
@@ -112,7 +119,8 @@ function buildSCPBase(server) {
 }
 
 function runLocal(cmd, description) {
-  const message = description || `Executing: ${cmd}`;
+  const message = description || `  - ${cmd}`;
+
   log("info", message);
 
   if (options.dryRun) return;
@@ -130,24 +138,26 @@ function runLocal(cmd, description) {
 function runSSH(server, cmd, description) {
   const base = buildSSHBase(server);
   const fullCmd = `${base} '${cmd}'`;
+  const message = description || `  - ${cmd}`;
 
-  if (description) {
-    log("info", `${description}...`);
-  }
+  log("info", message);
 
   if (options.dryRun) return;
 
   try {
     return execSync(fullCmd, { stdio: "pipe" }).toString().trim();
   } catch (err) {
-    // Only log error if no description is provided (to avoid duplicate messages)
     if (!description) {
-      log("error", `Command failed on ${server.host}`);
+      // Only log error if no description is provided (to avoid duplicate messages)
+      log("error", `Command failed`);
     }
+
     // Create a clean error without exposing the full command or stderr
-    const cleanError = new Error(`SSH command failed on ${server.host}`);
+    const cleanError = new Error(`SSH command failed`);
+
     cleanError.host = server.host;
     cleanError.description = description;
+
     throw cleanError;
   }
 }
@@ -165,9 +175,12 @@ function scpTo(server, localFile, remotePath) {
     log("success", `Package uploaded successfully!`);
   } catch (err) {
     log("error", `Upload failed to ${server.host}`);
+
     // Create a clean error without exposing the full command or stderr
     const cleanError = new Error(`Upload failed to ${server.host}`);
+
     cleanError.host = server.host;
+
     throw cleanError;
   }
 }
@@ -190,16 +203,19 @@ function generateReleaseId() {
 function bumpVersion(type = "patch") {
   const parts = pkg.version.split(".").map((n) => parseInt(n));
 
-  if (type === "major") {
-    parts[0] += 1;
-    parts[1] = 0;
-    parts[2] = 0;
-  } else if (type === "minor") {
-    parts[1] += 1;
-    parts[2] = 0;
-  } else {
-    // patch
-    parts[2] += 1;
+  switch (type) {
+    case "major":
+      parts[0] += 1;
+      parts[1] = 0;
+      parts[2] = 0;
+      break;
+    case "minor":
+      parts[1] += 1;
+      parts[2] = 0;
+      break;
+    default: // patch
+      parts[2] += 1;
+      break;
   }
 
   const newVersion = parts.join(".");
@@ -217,7 +233,6 @@ function bumpVersion(type = "patch") {
 function buildZipCommand(distDir, archive, config) {
   const includePatterns = config.include || [];
   const ignorePatterns = config.ignore || [".git/*"];
-
   let zipCmd = `cd ${distDir} && zip -r ../${archive}`;
 
   if (includePatterns.length > 0) {
@@ -244,6 +259,7 @@ function copyWellKnown(server, sourceDir, targetDir) {
       cp -r "${sourceDir}/.well-known/"* "${targetDir}/.well-known/" 2>/dev/null || echo "Warning: Failed to copy .well-known"
     fi
   `;
+
   try {
     runSSH(server, cmd, "Copying .well-known for Let's Encrypt");
   } catch (err) {
@@ -258,15 +274,20 @@ function copyWellKnown(server, sourceDir, targetDir) {
 async function deploy() {
   const config = loadConfig();
   const startTime = Date.now();
-
   const originalVersion = pkg.version;
   const version = bumpVersion(options.versionBump);
   const releaseId = `${generateReleaseId()}-${version}`;
 
   const deployToServer = async (server) => {
+    log("info", `Server: ${server.host}`);
+
     // Run preScripts locally for this server
-    for (const script of server.preScripts || []) {
-      runLocal(script);
+    if (server.preScripts && server.preScripts.length > 0) {
+      log("info", "Running pre-scripts...");
+
+      for (const script of server.preScripts) {
+        runLocal(script);
+      }
     }
 
     // Create zip for this server's distDir
@@ -277,19 +298,21 @@ async function deploy() {
       ignore: server.ignore ?? config.ignore ?? [".git/*"],
     };
     const zipCommand = buildZipCommand(distDir, archive, serverConfig);
-    runLocal(zipCommand, `Creating deployment package for ${server.host}...`);
+
+    runLocal(zipCommand, "Creating package...");
 
     const base = server.deployTo;
     const releaseBase = `${base}/releases`;
     const releaseDir = `${releaseBase}/${releaseId}`;
     const lockFile = `${base}/.bare-deploy.lock`;
+    let previousReleaseForRollback;
 
-    log("info", `Deploying to ${server.host}...`);
+    log("info", "Deploying...");
 
     try {
       // Lock protection
-      runSSH(server, `if [ -f ${lockFile} ]; then echo "Deploy locked"; exit 1; fi`, "Checking deployment lock");
-      runSSH(server, `touch ${lockFile}`, "Acquiring deployment lock");
+      runSSH(server, `if [ -f ${lockFile} ]; then echo "Deploy locked"; exit 1; fi`, "Checking lock");
+      runSSH(server, `touch ${lockFile}`, "Acquiring lock");
 
       // Create release directory BEFORE uploading
       runSSH(server, `mkdir -p ${releaseDir}`, "Creating release directory");
@@ -301,6 +324,7 @@ async function deploy() {
           `[ -d "${server.webroot}" ] && echo "dir" || echo "not-dir"`,
           "Checking webroot type",
         );
+
         if (isDir === "dir") {
           runSSH(server, `mv "${server.webroot}" "${server.webroot}.bak"`, "Backing up original webroot");
         }
@@ -314,11 +338,11 @@ async function deploy() {
         unzip -q ${releaseDir}/${archive} -d ${releaseDir} &&
         rm -f ${releaseDir}/${archive}
       `,
-        "Extracting deployment package",
+        "Extracting package",
       );
 
-      // Copy .well-known for Let's Encrypt before switching
       if (server.webroot) {
+        // Copy .well-known for Let's Encrypt before switching
         // Get previous webroot target
         const previousWebrootTarget = runSSH(
           server,
@@ -343,11 +367,10 @@ async function deploy() {
           // First deploy: copy from backup
           copyWellKnown(server, `${server.webroot}.bak`, releaseDir);
         }
-        // If neither exists, skip silently
       }
 
       // Capture previous release for potential rollback
-      const previousRelease = runSSH(
+      previousReleaseForRollback = runSSH(
         server,
         `readlink ${releaseBase}/current 2>/dev/null || echo ""`,
         "Capturing previous release",
@@ -362,8 +385,12 @@ async function deploy() {
         runSSH(server, `ln -sfn ${releaseBase}/current "${server.webroot}"`, "Creating webroot symlink");
       }
 
-      for (const script of server.postScripts || []) {
-        runSSH(server, `cd ${releaseBase}/current && ${script}`, "Running post-deployment script");
+      if (server.postScripts && server.postScripts.length) {
+        log("info", "Running post-scripts...");
+
+        for (const script of server.postScripts) {
+          runSSH(server, script);
+        }
       }
 
       if (server.startScript) {
@@ -381,7 +408,7 @@ async function deploy() {
         );
       }
 
-      runSSH(server, `rm -f ${lockFile}`, "Releasing deployment lock");
+      runSSH(server, `rm -f ${lockFile}`, "Releasing lock");
 
       if (!options.dryRun) fs.unlinkSync(archive);
 
@@ -404,23 +431,15 @@ async function deploy() {
 
       try {
         // Attempt rollback if there was a previous release
-        if (previousRelease && previousRelease.trim() !== "") {
+        if (previousReleaseForRollback && previousReleaseForRollback.trim() !== "") {
           log("warn", "Attempting rollback to previous release...");
 
           // Revert symlink to previous release
-          runSSH(server, `ln -sfn ${previousRelease} ${releaseBase}/current`, "Reverting symlink to previous release");
-
-          // Re-run postScripts to restart the old version
-          if (server.postScripts && server.postScripts.length > 0) {
-            log("info", "Restarting previous release...");
-            for (const script of server.postScripts) {
-              try {
-                runSSH(server, `cd ${releaseBase}/current && ${script}`, "Running post-script for previous release");
-              } catch (scriptErr) {
-                log("warn", `Failed to run post-script during rollback: ${script}`);
-              }
-            }
-          }
+          runSSH(
+            server,
+            `ln -sfn ${previousReleaseForRollback} ${releaseBase}/current`,
+            "Reverting symlink to previous release",
+          );
 
           // Re-run startScript for rollback
           if (server.startScript) {
@@ -460,12 +479,12 @@ async function deploy() {
 
         // Clean up failed release directory
         runSSH(server, `rm -rf ${releaseDir} || true`, "Cleaning up failed deployment");
-        runSSH(server, `rm -f ${lockFile} || true`, "Releasing deployment lock");
+        runSSH(server, `rm -f ${lockFile} || true`, "Releasing lock");
       } catch (rollbackErr) {
         log("error", "Rollback failed - manual intervention may be required");
 
         try {
-          runSSH(server, `rm -f ${lockFile} || true`, "Releasing deployment lock");
+          runSSH(server, `rm -f ${lockFile} || true`, "Releasing lock");
         } catch {}
       }
 
@@ -501,7 +520,7 @@ async function deploy() {
     duration = `${totalSeconds.toFixed(3)}s`;
   }
 
-  log("success", `Deployment completed in ${duration}.`);
+  log("success", `Completed in ${duration}.`);
 }
 
 // ------------------------------
@@ -557,11 +576,14 @@ async function rollback(version) {
 
     if (options.dryRun) {
       log("info", `Rolling back to ${version}...`);
+
       if (server.webroot) {
         log("info", "Updating webroot symlink...");
       }
+
       log("info", "Running start script for rolled back release...");
       log("success", `Rollback completed on ${server.host}`);
+
       return;
     }
 
@@ -709,6 +731,7 @@ async function cleanup() {
         `,
           "Cleaning up old releases",
         );
+
         log("success", `Cleanup completed on ${server.host}`);
       } else {
         log("info", `No old releases to clean up on ${server.host}`);

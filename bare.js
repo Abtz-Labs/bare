@@ -31,7 +31,7 @@ const options = {
   json: args.includes("--json"),
   parallel: !args.includes("--sequential"),
   versionBump: args.includes("--major") ? "major" : args.includes("--minor") ? "minor" : "patch",
-  queryVersion: args.includes("--version") || args.includes("-v")
+  queryVersion: args.includes("--version") || args.includes("-v"),
 };
 
 // ------------------------------
@@ -78,10 +78,10 @@ function log(level, message, meta = {}) {
 // ------------------------------
 
 function loadConfig() {
-  const file = path.join(process.cwd(), "bare.json");
+  const file = path.join(process.cwd(), "bare.config.json");
 
   if (!fs.existsSync(file)) {
-    log("error", "bare.json not found.");
+    log("error", "bare.config.json not found.");
     process.exit(1);
   }
 
@@ -261,7 +261,8 @@ async function deploy() {
 
   const deployToServer = async (server) => {
     const base = config.deployTo;
-    const releaseDir = `${base}/releases/${releaseId}`;
+    const releaseBase = `${base}/releases`;
+    const releaseDir = `${releaseBase}/${releaseId}`;
     const lockFile = `${base}/.deploy.lock`;
 
     log("info", `Deploying to ${server.host}...`);
@@ -286,16 +287,18 @@ async function deploy() {
       // Capture previous release for potential rollback
       const previousRelease = runSSH(
         server,
-        `readlink ${base}/current 2>/dev/null || echo ""`,
+        `readlink ${releaseBase}/current 2>/dev/null || echo ""`,
         "Capturing previous release",
       );
 
       // Update symlink BEFORE running postScripts so they operate on the new release
-      runSSH(server, `ln -sfn ${releaseDir} ${base}/current`, "Activating new release");
+      runSSH(server, `ln -sfn ${releaseDir} ${releaseBase}/current`, "Activating new release");
 
       for (const script of config.postScripts || []) {
-        runSSH(server, `cd ${base}/current && ${script}`, "Running post-deployment script");
+        runSSH(server, `cd ${releaseBase}/current && ${script}`, "Running post-deployment script");
       }
+
+      // TODO: Add support to restartCommand (maybe here?)
 
       if (config.healthCheck?.url) {
         runSSH(
@@ -320,14 +323,14 @@ async function deploy() {
           log("warn", "Attempting rollback to previous release...");
 
           // Revert symlink to previous release
-          runSSH(server, `ln -sfn ${previousRelease} ${base}/current`, "Reverting symlink to previous release");
+          runSSH(server, `ln -sfn ${previousRelease} ${releaseBase}/current`, "Reverting symlink to previous release");
 
           // Re-run postScripts to restart the old version
           if (config.postScripts && config.postScripts.length > 0) {
             log("info", "Restarting previous release...");
             for (const script of config.postScripts) {
               try {
-                runSSH(server, `cd ${base}/current && ${script}`, "Running post-script for previous release");
+                runSSH(server, `cd ${releaseBase}/current && ${script}`, "Running post-script for previous release");
               } catch (scriptErr) {
                 log("warn", `Failed to run post-script during rollback: ${script}`);
               }
@@ -450,13 +453,16 @@ function rollback(version) {
   let hasErrors = false;
 
   config.servers.forEach((server) => {
+    const base = config.deployTo;
+    const releaseBase = `${base}/releases`;
+
     try {
       runSSH(
         server,
         `
-        ln -sfn ${config.deployTo}/releases/${version} ${config.deployTo}/current &&
-        cd ${config.deployTo}/current &&
-        pm2 reload ecosystem.config.js --update-env
+        ln -sfn ${releaseBase}/${version} ${releaseBase}/current &&
+        cd ${releaseBase}/current &&
+        ${config.restartCommand ?? "echo 'No restart needed"}
       `,
         `Rolling back to ${version}`,
       );
@@ -479,10 +485,10 @@ function rollback(version) {
 // ------------------------------
 
 function init() {
-  const configPath = path.join(process.cwd(), "bare.json");
+  const configPath = path.join(process.cwd(), "bare.config.json");
 
   if (fs.existsSync(configPath)) {
-    log("error", "bare.json already exists in current directory");
+    log("error", "bare.config.json already exists in current directory");
     process.exit(1);
   }
 
@@ -510,7 +516,7 @@ function init() {
   };
 
   fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
-  log("success", "Configuration file created. Edit 'bare.json' with your deployment settings.");
+  log("success", "Configuration file created. Edit 'bare.config.json' with your deployment settings.");
 }
 
 // ------------------------------
@@ -601,7 +607,7 @@ function cleanup() {
  Deploy tool by Abtz Labs (v${pkg.version})
 
 Commands:
-  init              Create bare.json config file
+  init              Create bare.config.json config file
   deploy            Run deployment
   list              List releases
   rollback <id>     Rollback to release

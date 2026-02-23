@@ -147,10 +147,7 @@ function runSSH(server, cmd, description) {
   try {
     return execSync(fullCmd, { stdio: "pipe" }).toString().trim();
   } catch (err) {
-    if (!description) {
-      // Only log error if no description is provided (to avoid duplicate messages)
-      log("error", `Command failed`);
-    }
+    log("error", `Command failed: ${description || cmd}`);
 
     // Create a clean error without exposing the full command or stderr
     const cleanError = new Error(`SSH command failed`);
@@ -314,7 +311,8 @@ async function deploy() {
       runSSH(server, `if [ -f ${lockFile} ]; then echo "Deploy locked"; exit 1; fi`, "Checking lock");
       runSSH(server, `touch ${lockFile}`, "Acquiring lock");
 
-      // Create release directory BEFORE uploading
+      // Create base deploy directory and release directory
+      runSSH(server, `mkdir -p ${releaseBase}`, "Creating deploy directory");
       runSSH(server, `mkdir -p ${releaseDir}`, "Creating release directory");
 
       if (server.webroot) {
@@ -369,7 +367,7 @@ async function deploy() {
         }
       }
 
-      // Capture previous release for potential rollback
+      // Capture previous release for potential rollback - BEFORE creating new symlink
       previousReleaseForRollback = runSSH(
         server,
         `readlink ${releaseBase}/current 2>/dev/null || echo ""`,
@@ -378,12 +376,6 @@ async function deploy() {
 
       // Update symlink BEFORE running postScripts so they operate on the new release
       runSSH(server, `ln -sfn ${releaseDir} ${releaseBase}/current`, "Activating new release");
-
-      // Handle webroot symlink
-      if (server.webroot) {
-        runSSH(server, `rm -rf "${server.webroot}" 2>/dev/null || true`, "Removing old webroot");
-        runSSH(server, `ln -sfn ${releaseBase}/current "${server.webroot}"`, "Creating webroot symlink");
-      }
 
       if (server.postScripts && server.postScripts.length) {
         log("info", "Running post-scripts...");
@@ -394,7 +386,8 @@ async function deploy() {
       }
 
       if (server.startScript) {
-        runSSH(server, `cd ${releaseBase}/current && ${server.startScript}`, "Running start script");
+        log("info", "Running start script...");
+        runSSH(server, `cd ${releaseBase}/current && ${server.startScript}`);
       }
 
       if (config.healthCheck?.url) {
@@ -430,51 +423,62 @@ async function deploy() {
       }
 
       try {
-        // Attempt rollback if there was a previous release
+        // Attempt rollback if there was a previous release AND it exists
         if (previousReleaseForRollback && previousReleaseForRollback.trim() !== "") {
-          log("warn", "Attempting rollback to previous release...");
-
-          // Revert symlink to previous release
-          runSSH(
+          // Verify previous release directory actually exists before rollback
+          const prevExists = runSSH(
             server,
-            `ln -sfn ${previousReleaseForRollback} ${releaseBase}/current`,
-            "Reverting symlink to previous release",
+            `[ -d "${previousReleaseForRollback}" ] && echo "yes" || echo "no"`,
+            "Verifying previous release exists",
           );
 
-          // Re-run startScript for rollback
-          if (server.startScript) {
-            try {
-              runSSH(
-                server,
-                `cd ${releaseBase}/current && ${server.startScript}`,
-                "Running start script for previous release",
-              );
-            } catch (scriptErr) {
-              log("warn", `Failed to run start script during rollback: ${server.startScript}`);
-            }
-          }
+          if (prevExists !== "yes") {
+            log("error", "First deployment failed - no valid previous release to revert to");
 
-          // Health check the previous release to confirm it's healthy
-          if (config.healthCheck?.url) {
-            try {
-              runSSH(
-                server,
-                `
-                timeout ${config.healthCheck.timeout || 15} \
-                curl -f ${config.healthCheck.url}
-              `,
-                "Verifying previous release health",
-              );
-              log("success", "Rollback successful - previous release is healthy");
-            } catch (healthErr) {
-              log("error", "WARNING: Previous release health check failed after rollback!");
-            }
+            // Remove the broken symlink
+            runSSH(server, `rm -f ${releaseBase}/current`, "Removing broken symlink");
           } else {
-            log("success", "Rollback completed");
+            log("warn", "Attempting rollback to previous release...");
+
+            // Revert symlink to previous release
+            runSSH(
+              server,
+              `ln -sfn ${previousReleaseForRollback} ${releaseBase}/current`,
+              "Reverting symlink to previous release",
+            );
+
+            // Re-run startScript for rollback
+            if (server.startScript) {
+              try {
+                runSSH(
+                  server,
+                  `cd ${releaseBase}/current && ${server.startScript}`,
+                  "Running start script for previous release",
+                );
+              } catch (scriptErr) {
+                log("warn", `Failed to run start script during rollback: ${server.startScript}`);
+              }
+            }
+
+            // Health check the previous release to confirm it's healthy
+            if (config.healthCheck?.url) {
+              try {
+                runSSH(
+                  server,
+                  `
+                  timeout ${config.healthCheck.timeout || 15} \
+                  curl -f ${config.healthCheck.url}
+                `,
+                  "Verifying previous release health",
+                );
+                log("success", "Rollback successful - previous release is healthy");
+              } catch (healthErr) {
+                log("error", "WARNING: Previous release health check failed after rollback!");
+              }
+            } else {
+              log("success", "Rollback completed");
+            }
           }
-        } else {
-          log("error", "First deployment failed - no previous release to revert to");
-          log("info", "Check your application logs and configuration, then try deploying again");
         }
 
         // Clean up failed release directory

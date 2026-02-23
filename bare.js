@@ -245,22 +245,22 @@ async function deploy() {
   const config = loadConfig();
   const startTime = Date.now();
 
-  log("info", "Running pre-scripts...");
-
-  for (const script of config.preScripts || []) {
-    runLocal(script);
-  }
-
   const version = bumpVersion(options.versionBump);
   const releaseId = `${generateReleaseId()}-${version}`;
-  const archive = `${releaseId}.zip`;
-
-  const distDir = config.distDir || ".";
-  const zipCommand = buildZipCommand(distDir, archive, config);
-  runLocal(zipCommand, "Creating deployment package...");
 
   const deployToServer = async (server) => {
-    const base = config.deployTo;
+    // Run preScripts locally for this server
+    for (const script of server.preScripts || []) {
+      runLocal(script);
+    }
+
+    // Create zip for this server's distDir
+    const archive = `${releaseId}.${server.host}.zip`;
+    const distDir = server.distDir || ".";
+    const zipCommand = buildZipCommand(distDir, archive, config);
+    runLocal(zipCommand, `Creating deployment package for ${server.host}...`);
+
+    const base = server.deployTo;
     const releaseBase = `${base}/releases`;
     const releaseDir = `${releaseBase}/${releaseId}`;
     const lockFile = `${base}/.deploy.lock`;
@@ -272,15 +272,16 @@ async function deploy() {
       runSSH(server, `if [ -f ${lockFile} ]; then echo "Deploy locked"; exit 1; fi`, "Checking deployment lock");
       runSSH(server, `touch ${lockFile}`, "Acquiring deployment lock");
 
-      scpTo(server, archive, `${config.tmpDir}/${archive}`);
+      scpTo(server, archive, `${releaseDir}/${archive}`);
 
       runSSH(
         server,
         `
         mkdir -p ${base}/releases &&
         mkdir -p ${releaseDir} &&
-        unzip -q ${config.tmpDir}/${archive} -d ${releaseDir}
-        `,
+        unzip -q ${releaseDir}/${archive} -d ${releaseDir} &&
+        rm -f ${releaseDir}/${archive}
+      `,
         "Extracting deployment package",
       );
 
@@ -294,11 +295,13 @@ async function deploy() {
       // Update symlink BEFORE running postScripts so they operate on the new release
       runSSH(server, `ln -sfn ${releaseDir} ${releaseBase}/current`, "Activating new release");
 
-      for (const script of config.postScripts || []) {
+      for (const script of server.postScripts || []) {
         runSSH(server, `cd ${releaseBase}/current && ${script}`, "Running post-deployment script");
       }
 
-      // TODO: Add support to restartCommand (maybe here?)
+      if (server.startScript) {
+        runSSH(server, `cd ${releaseBase}/current && ${server.startScript}`, "Running start script");
+      }
 
       if (config.healthCheck?.url) {
         runSSH(
@@ -313,7 +316,9 @@ async function deploy() {
 
       runSSH(server, `rm -f ${lockFile}`, "Releasing deployment lock");
 
-      log("success", `Deploy successful!`);
+      if (!options.dryRun) fs.unlinkSync(archive);
+
+      log("success", `Deploy successful on ${server.host}!`);
     } catch (err) {
       log("error", `Deploy failed on ${server.host}`);
 
@@ -326,14 +331,23 @@ async function deploy() {
           runSSH(server, `ln -sfn ${previousRelease} ${releaseBase}/current`, "Reverting symlink to previous release");
 
           // Re-run postScripts to restart the old version
-          if (config.postScripts && config.postScripts.length > 0) {
+          if (server.postScripts && server.postScripts.length > 0) {
             log("info", "Restarting previous release...");
-            for (const script of config.postScripts) {
+            for (const script of server.postScripts) {
               try {
                 runSSH(server, `cd ${releaseBase}/current && ${script}`, "Running post-script for previous release");
               } catch (scriptErr) {
                 log("warn", `Failed to run post-script during rollback: ${script}`);
               }
+            }
+          }
+
+          // Re-run startScript for rollback
+          if (server.startScript) {
+            try {
+              runSSH(server, `cd ${releaseBase}/current && ${server.startScript}`, "Running start script for previous release");
+            } catch (scriptErr) {
+              log("warn", `Failed to run start script during rollback: ${server.startScript}`);
             }
           }
 
@@ -382,8 +396,6 @@ async function deploy() {
     }
   }
 
-  if (!options.dryRun) fs.unlinkSync(archive);
-
   log("success", `Deploy ID: ${releaseId}`);
 
   const totalSeconds = (Date.now() - startTime) / 1000;
@@ -423,7 +435,7 @@ function listReleases() {
 
       const releases = runSSH(
         server,
-        `ls -1 ${config.deployTo}/releases 2>/dev/null || echo "No releases found"`,
+        `ls -1 ${server.deployTo}/releases 2>/dev/null || echo "No releases found"`,
         "Listing releases",
       );
 
@@ -453,7 +465,7 @@ function rollback(version) {
   let hasErrors = false;
 
   config.servers.forEach((server) => {
-    const base = config.deployTo;
+    const base = server.deployTo;
     const releaseBase = `${base}/releases`;
 
     try {
@@ -531,7 +543,7 @@ function cleanup() {
       const releasesToRemove = runSSH(
         server,
         `
-        cd ${config.deployTo}/releases &&
+        cd ${server.deployTo}/releases &&
         ls -1t | tail -n +${config.keepReleases + 1}
       `,
         "Finding old releases",
@@ -548,7 +560,7 @@ function cleanup() {
         runSSH(
           server,
           `
-          cd ${config.deployTo}/releases &&
+          cd ${server.deployTo}/releases &&
           ls -1t | tail -n +${config.keepReleases + 1} | xargs -r rm -rf
         `,
           "Cleaning up old releases",

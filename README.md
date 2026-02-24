@@ -132,7 +132,7 @@ Each server in the `servers` array can have its own configuration:
 
 #### `servers[].distDir`
 
-The directory to package for deployment (default: `"."`).
+The directory to package for deployment (default: `"./dist"`).
 
 #### `servers[].deployTo`
 

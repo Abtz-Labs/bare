@@ -123,6 +123,40 @@ describe("CLI commands", () => {
         process.chdir(currentDir);
       }
     });
+
+    it("exits with error if package.json missing", async () => {
+      const currentDir = process.cwd();
+      const noPkgDir = fs.mkdtempSync("/tmp/bare-no-pkg-");
+
+      try {
+        const config = {
+          servers: [
+            {
+              host: "test-server.example.com",
+              user: "deploy",
+              port: 22,
+              identityFile: "~/.ssh/id_rsa",
+              distDir: "./dist",
+              deployTo: "/var/www/app",
+              webroot: "",
+              include: [],
+              ignore: [".git/*"],
+              preScripts: [],
+              postScripts: [],
+              startScript: "pm2 restart app",
+            },
+          ],
+          keepReleases: 5,
+        };
+        fs.writeFileSync(path.join(noPkgDir, "bare.config.json"), JSON.stringify(config, null, 2));
+        process.chdir(noPkgDir);
+        const { deploy } = await import("../../bare.js");
+        await expect(deploy()).rejects.toThrow(/package\.json not found/);
+      } finally {
+        process.chdir(currentDir);
+        fs.rmSync(noPkgDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("list", () => {
@@ -136,6 +170,74 @@ describe("CLI commands", () => {
 
       const { listReleases } = await import("../../bare.js");
       listReleases();
+    });
+
+    it("exits with error if package.json missing", async () => {
+      const currentDir = process.cwd();
+      const noPkgDir = fs.mkdtempSync("/tmp/bare-no-pkg-");
+
+      try {
+        const config = {
+          servers: [
+            {
+              host: "test-server.example.com",
+              user: "deploy",
+              port: 22,
+              identityFile: "~/.ssh/id_rsa",
+              distDir: "./dist",
+              deployTo: "/var/www/app",
+              webroot: "",
+              include: [],
+              ignore: [".git/*"],
+              preScripts: [],
+              postScripts: [],
+              startScript: "pm2 restart app",
+            },
+          ],
+          keepReleases: 5,
+        };
+        fs.writeFileSync(path.join(noPkgDir, "bare.config.json"), JSON.stringify(config, null, 2));
+        process.chdir(noPkgDir);
+        const { deploy } = await import("../../bare.js");
+        await expect(deploy()).rejects.toThrow(/package\.json not found/);
+      } finally {
+        process.chdir(currentDir);
+        fs.rmSync(noPkgDir, { recursive: true, force: true });
+      }
+    });
+
+    it("works without package.json (only needs bare.config.json)", async () => {
+      const currentDir = process.cwd();
+      const noPkgDir = fs.mkdtempSync("/tmp/bare-no-pkg-");
+
+      try {
+        const config = {
+          servers: [
+            {
+              host: "test-server.example.com",
+              user: "deploy",
+              port: 22,
+              identityFile: "~/.ssh/id_rsa",
+              distDir: "./dist",
+              deployTo: "/var/www/app",
+              webroot: "",
+              include: [],
+              ignore: [".git/*"],
+              preScripts: [],
+              postScripts: [],
+              startScript: "pm2 restart app",
+            },
+          ],
+          keepReleases: 5,
+        };
+        fs.writeFileSync(path.join(noPkgDir, "bare.config.json"), JSON.stringify(config, null, 2));
+        process.chdir(noPkgDir);
+        const { listReleases } = await import("../../bare.js");
+        expect(() => listReleases()).not.toThrow();
+      } finally {
+        process.chdir(currentDir);
+        fs.rmSync(noPkgDir, { recursive: true, force: true });
+      }
     });
   });
 
@@ -153,6 +255,40 @@ describe("CLI commands", () => {
     it("exits with error if no version provided", async () => {
       const { rollback } = await import("../../bare.js");
       await expect(rollback()).rejects.toThrow();
+    });
+
+    it("works without package.json (only needs bare.config.json)", async () => {
+      const currentDir = process.cwd();
+      const noPkgDir = fs.mkdtempSync("/tmp/bare-no-pkg-");
+
+      try {
+        const config = {
+          servers: [
+            {
+              host: "test-server.example.com",
+              user: "deploy",
+              port: 22,
+              identityFile: "~/.ssh/id_rsa",
+              distDir: "./dist",
+              deployTo: "/var/www/app",
+              webroot: "",
+              include: [],
+              ignore: [".git/*"],
+              preScripts: [],
+              postScripts: [],
+              startScript: "pm2 restart app",
+            },
+          ],
+          keepReleases: 5,
+        };
+        fs.writeFileSync(path.join(noPkgDir, "bare.config.json"), JSON.stringify(config, null, 2));
+        process.chdir(noPkgDir);
+        const { rollback } = await import("../../bare.js");
+        await expect(rollback("20260220123456-v1.0.1")).resolves.not.toThrow();
+      } finally {
+        process.chdir(currentDir);
+        fs.rmSync(noPkgDir, { recursive: true, force: true });
+      }
     });
   });
 

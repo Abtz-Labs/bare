@@ -19,38 +19,22 @@ describe("utils", () => {
   });
 
   describe("bumpVersion", () => {
-    let originalVersion;
-    const testPkgPath = path.join(process.cwd(), "package.json");
-
-    beforeEach(() => {
-      originalVersion = JSON.parse(fs.readFileSync(testPkgPath)).version;
-    });
-
-    afterEach(() => {
-      const pkg = JSON.parse(fs.readFileSync(testPkgPath));
-      pkg.version = originalVersion;
-      fs.writeFileSync(testPkgPath, JSON.stringify(pkg, null, 2));
-    });
-
     it("bumps patch version by default", () => {
-      const result = bumpVersion("patch");
-      const parts = result.split(".");
-      expect(parseInt(parts[2])).toBe(parseInt(originalVersion.split(".")[2]) + 1);
+      const pkg = { version: "1.0.0" };
+      const result = bumpVersion(pkg, "patch");
+      expect(result).toBe("1.0.1");
     });
 
     it("bumps minor version", () => {
-      const result = bumpVersion("minor");
-      const parts = result.split(".");
-      expect(parseInt(parts[1])).toBe(parseInt(originalVersion.split(".")[1]) + 1);
-      expect(parts[2]).toBe("0");
+      const pkg = { version: "1.0.0" };
+      const result = bumpVersion(pkg, "minor");
+      expect(result).toBe("1.1.0");
     });
 
     it("bumps major version", () => {
-      const result = bumpVersion("major");
-      const parts = result.split(".");
-      expect(parseInt(parts[0])).toBe(parseInt(originalVersion.split(".")[0]) + 1);
-      expect(parts[1]).toBe("0");
-      expect(parts[2]).toBe("0");
+      const pkg = { version: "1.0.0" };
+      const result = bumpVersion(pkg, "major");
+      expect(result).toBe("2.0.0");
     });
   });
 

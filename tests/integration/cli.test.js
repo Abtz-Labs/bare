@@ -65,17 +65,20 @@ describe("CLI commands", () => {
   describe("init", () => {
     it("creates config file in empty directory", async () => {
       const testInitDir = fs.mkdtempSync("/tmp/bare-init-test-");
-      process.chdir(testInitDir);
+      const currentDir = process.cwd();
 
-      const { init } = await import("../../bare.js");
-      init();
+      try {
+        process.chdir(testInitDir);
+        const { init } = await import("../../bare.js");
+        init();
 
-      expect(fs.existsSync("bare.config.json")).toBe(true);
-      const config = JSON.parse(fs.readFileSync("bare.config.json"));
-      expect(config.servers).toBeDefined();
-
-      process.chdir(originalCwd);
-      fs.rmSync(testInitDir, { recursive: true, force: true });
+        expect(fs.existsSync("bare.config.json")).toBe(true);
+        const config = JSON.parse(fs.readFileSync("bare.config.json"));
+        expect(config.servers).toBeDefined();
+      } finally {
+        process.chdir(currentDir);
+        fs.rmSync(testInitDir, { recursive: true, force: true });
+      }
     });
 
     it("exits with error if config already exists", async () => {
@@ -109,11 +112,16 @@ describe("CLI commands", () => {
     });
 
     it("exits with error if config missing", async () => {
+      const currentDir = process.cwd();
       fs.rmSync("bare.config.json");
-      process.chdir("/tmp");
 
-      const { deploy } = await import("../../bare.js");
-      await expect(deploy()).rejects.toThrow();
+      try {
+        process.chdir("/tmp");
+        const { deploy } = await import("../../bare.js");
+        await expect(deploy()).rejects.toThrow();
+      } finally {
+        process.chdir(currentDir);
+      }
     });
   });
 

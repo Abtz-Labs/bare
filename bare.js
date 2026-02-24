@@ -14,10 +14,44 @@
 
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { execSync } from "child_process";
 
-const pkgPath = path.join(process.cwd(), "package.json");
-const pkg = JSON.parse(fs.readFileSync(pkgPath));
+// ------------------------------
+// CONFIG
+// ------------------------------
+
+function getCliVersion() {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const pkgPath = path.join(__dirname, "package.json");
+    return JSON.parse(fs.readFileSync(pkgPath)).version;
+  } catch {
+    return "?.?.?";
+  }
+}
+
+function loadPkg() {
+  const pkgPath = path.join(process.cwd(), "package.json");
+
+  if (!fs.existsSync(pkgPath)) {
+    throw new Error("package.json not found. Run in a project directory with package.json.");
+  }
+
+  return JSON.parse(fs.readFileSync(pkgPath));
+}
+
+function loadConfig() {
+  const file = path.join(process.cwd(), "bare.config.json");
+
+  if (!fs.existsSync(file)) {
+    log("error", "bare.config.json not found.");
+    process.exit(1);
+  }
+
+  return JSON.parse(fs.readFileSync(file));
+}
 
 // ------------------------------
 // CLI ARGUMENTS
@@ -78,21 +112,6 @@ function log(level, message, meta = {}) {
   }
 
   console.log(`${color}${message}${colors.reset}`);
-}
-
-// ------------------------------
-// CONFIG
-// ------------------------------
-
-function loadConfig() {
-  const file = path.join(process.cwd(), "bare.config.json");
-
-  if (!fs.existsSync(file)) {
-    log("error", "bare.config.json not found.");
-    process.exit(1);
-  }
-
-  return JSON.parse(fs.readFileSync(file));
 }
 
 // ------------------------------
@@ -197,7 +216,7 @@ function generateReleaseId() {
     .slice(0, 14);
 }
 
-function bumpVersion(type = "patch") {
+function bumpVersion(pkg, type = "patch") {
   const parts = pkg.version.split(".").map((n) => parseInt(n));
 
   switch (type) {
@@ -216,11 +235,6 @@ function bumpVersion(type = "patch") {
   }
 
   const newVersion = parts.join(".");
-
-  if (!options.dryRun) {
-    pkg.version = newVersion;
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
-  }
 
   log("success", `Version bumped to ${newVersion} (${type})`);
 
@@ -270,9 +284,18 @@ function copyWellKnown(server, sourceDir, targetDir) {
 
 async function deploy() {
   const config = loadConfig();
+  const pkg = loadPkg();
   const startTime = Date.now();
   const originalVersion = pkg.version;
-  const version = bumpVersion(options.versionBump);
+  const newVersion = bumpVersion(pkg, options.versionBump);
+
+  if (!options.dryRun) {
+    pkg.version = newVersion;
+    const pkgPath = path.join(process.cwd(), "package.json");
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+  }
+
+  const version = newVersion;
   const releaseId = `${generateReleaseId()}-${version}`;
 
   const deployToServer = async (server) => {
@@ -411,6 +434,7 @@ async function deploy() {
 
       // Rollback version in package.json
       if (!options.dryRun) {
+        const pkgPath = path.join(process.cwd(), "package.json");
         pkg.version = originalVersion;
         fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
         log("info", `Rolled back version to ${originalVersion}`);
@@ -762,7 +786,7 @@ async function cleanup() {
 
 (async () => {
   if (options.queryVersion) {
-    console.log(`Bare Deploy v${pkg.version}`);
+    console.log(`Bare Deploy v${getCliVersion()}`);
     return;
   }
 
@@ -785,13 +809,14 @@ async function cleanup() {
         break;
       case "help":
       default:
+        const cliVersion = getCliVersion();
         console.log(`
  ██████   █████  ██████  ███████
  ██   ██ ██   ██ ██   ██ ██
  ██████  ███████ ██████  █████
  ██   ██ ██   ██ ██   ██ ██
  ██████  ██   ██ ██   ██ ███████
- Deploy tool by Abtz Labs (v${pkg.version})
+  Deploy tool by Abtz Labs (v${cliVersion})
 
 Commands:
   init              Create bare.config.json file

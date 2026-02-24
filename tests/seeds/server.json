@@ -1,0 +1,14 @@
+{
+  "host": "test-server.example.com",
+  "user": "deploy",
+  "port": 22,
+  "identityFile": "~/.ssh/id_rsa",
+  "distDir": "./dist",
+  "deployTo": "/var/www/app",
+  "webroot": "/var/www/html",
+  "include": [],
+  "ignore": [".git/*", "node_modules/*"],
+  "preScripts": ["echo 'pre-deploy'"],
+  "postScripts": ["echo 'post-deploy'"],
+  "startScript": "npm start"
+}

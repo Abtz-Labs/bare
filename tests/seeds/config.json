@@ -1,0 +1,25 @@
+{
+  "servers": [
+    {
+      "host": "server1.example.com",
+      "user": "deploy",
+      "port": 22,
+      "identityFile": "~/.ssh/id_rsa",
+      "distDir": "./dist",
+      "deployTo": "/var/www/app",
+      "webroot": "",
+      "include": [],
+      "ignore": [".git/*"],
+      "preScripts": [],
+      "postScripts": [],
+      "startScript": "pm2 restart app"
+    }
+  ],
+  "keepReleases": 5,
+  "include": [],
+  "ignore": [".git/*"],
+  "healthCheck": {
+    "url": "http://localhost:3000/health",
+    "timeout": 15
+  }
+}

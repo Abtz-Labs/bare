@@ -1,4 +1,5 @@
+node_modules/
 dist/
-bare.config.json
 
+bare.config.json
 .editorconfig

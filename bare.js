@@ -816,3 +816,23 @@ For full documentation, visit: https://github.com/abtz-labs/bare
     process.exit(1);
   }
 })();
+
+// Exports for testing
+export {
+  generateReleaseId,
+  bumpVersion,
+  buildZipCommand,
+  buildSSHBase,
+  buildSCPBase,
+  log,
+  loadConfig,
+  options,
+  runSSH,
+  runLocal,
+  scpTo,
+  deploy,
+  listReleases,
+  rollback,
+  cleanup,
+  init,
+};

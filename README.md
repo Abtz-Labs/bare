@@ -16,6 +16,7 @@ Atomic zero-downtime deployments to **bare VPS servers** over SSH.
 - No containers.
 - No agents.
 - No orchestration layers.
+- Works out-of-the-box
 
 Just disciplined releases.
 
@@ -23,9 +24,9 @@ Just disciplined releases.
 
 ## Philosophy
 
-Bare is built for developers who:
+Bare Deploy is built for developers who:
 
-- Deploy Node.js apps directly to VPS instances
+- Deploy static websites, Node.js or PHP apps directly to VPS instances
 - Want atomic releases with instant rollback
 - Prefer SSH over platform abstraction
 - Value operational clarity over orchestration complexity
@@ -39,22 +40,22 @@ Inspired by the simplicity of [Kamal](https://kamal-deploy.org/), but designed f
 - Atomic symlink-based releases
 - Zero-downtime cutovers
 - Parallel multi-server deploy
-- Per-server configuration (different distDirs for different servers)
+- Per-server configuration (different `distDirs` for different servers)
 - SSH key authentication (no password prompts)
 - Configurable pre & post hooks
 - Automatic version bump
 - Health check validation
-- Lock file to prevent concurrent deploys
+- Lock-file to prevent concurrent deploys
 - Dry-run mode
 - Structured colored logs
 - Optional JSON logging
 - Rollback support
 - Release pruning
-- Webroot support for static sites with Let's Encrypt preservation
+- Support for static sites with Let's Encrypt preservation
 
 ---
 
-## Installation
+## How to Install
 
 ```bash
 npm install -g bare-deploy
@@ -64,7 +65,7 @@ npm install -g bare-deploy
 
 ## Quick Start
 
-In your project root, run the following command to generate the `bare.config.json` configuration file.:
+In your project root, run the following command to generate the `bare.config.json` configuration file:
 
 ```sh
 bare init
@@ -125,42 +126,44 @@ Each server in the `servers` array can have its own configuration:
       "preScripts": [],
       "postScripts": [],
       "startScript": "pm2 restart --env production --update-env"
-    }
+    },
+
+    // ...
   ]
 }
 ```
 
 #### `servers[].distDir`
 
-The directory to package for deployment (default: `"./dist"`).
+The directory where the content to package for deployment lives on (default: `"./dist"`).
 
 #### `servers[].deployTo`
 
-The base path on the server where deployments are stored. Creates a `releases/` subfolder with timestamped versions.
+The base path **on the server** where deployments are stored. Bare Deploy creates a `releases/` subfolder with timestamped versions.
 
-#### `servers[].webroot` (per server, optional)
+#### `servers[].webroot`
 
-Path to the web server's document root. When set:
+Optional. Path to the web server's document root. When set:
 
-- On first deploy: backs up existing `webroot` to `{webroot}.bak`, then creates symlink
+- On first deploy: backs up existing `webroot` to `{webroot}.bak`, then creates a symlink
 - Automatically copies `.well-known/` (Let's Encrypt) from previous deployment
 - Creates symlink: `webroot` → `releases/current`
 
 #### `servers[].preScripts`
 
-Array of commands to run locally before building the deployment package.
+Optional. Array of commands to **run locally** before building the deployment package.
 
 #### `servers[].postScripts`
 
-Array of commands to run on the server after deployment but before switching the symlink.
+Optional. Array of commands to **run on the server** after deployment but before switching the symlink.
 
 #### `servers[].startScript`
 
-Command to run after symlink switch. Useful for process managers like PM2.
+Optional. Command to run after symlink switch. Useful for process managers like PM2.
 
 #### `servers[].include`
 
-Array of file patterns to include in the deployment package for this server. When specified, only matching files are packaged. Supports glob patterns. Falls back to global `include` if not set.
+Optional. Array of file patterns to include in the deployment package for this server. When specified, only matching files are packaged. Supports glob patterns. Falls back to global `include` if not set.
 
 **Example**:
 ```json
@@ -174,7 +177,7 @@ Array of file patterns to include in the deployment package for this server. Whe
 
 #### `servers[].ignore`
 
-Array of file patterns to exclude from the deployment package for this server (default: `[".git/*"]`). Applied after `include` patterns. Falls back to global `ignore` if not set.
+Optional. Array of file patterns to exclude from the deployment package for this server (default: `[".git/*"]`). Applied after `include` patterns. Falls back to global `ignore` if not set.
 
 **Example**:
 ```json
@@ -187,19 +190,19 @@ Array of file patterns to exclude from the deployment package for this server (d
 
 #### `include`
 
-Global array of file patterns to include in the deployment package. Used as fallback when not defined per-server.
+Optional. Global array of file patterns to include in the deployment package. Used as fallback when not defined per-server.
 
 #### `ignore`
 
-Global array of file patterns to exclude from the deployment package (default: `[".git/*"]`). Used as fallback when not defined per-server.
+Optional. Global array of file patterns to exclude from the deployment package (default: `[".git/*"]`). Used as fallback when not defined per-server.
 
 #### `keepReleases`
 
-#### `keepReleases`
-
-Number of releases to keep on the server (default: `5`).
+Optional. Number of releases to keep on the server as history (default: `5`).
 
 #### `healthCheck`
+
+Optional. When set, runs at the very end, after running all the deploy steps to make sure your deploy was successful. If health check fails, the deploy is automatically rolled back to its previous version.
 
 Health check configuration:
 
@@ -211,7 +214,7 @@ Health check configuration:
 ## How to Deploy
 
 ```sh
-bare deploy [--patch | --minor | --major] [--json] [--dry-run]
+bare deploy [options]
 ```
 
 ### Options:
@@ -227,20 +230,23 @@ bare deploy [--patch | --minor | --major] [--json] [--dry-run]
 
 ### How It Works
 
-- Runs local pre-deploy scripts
-- Bumps package.json version
-- Creates build artifact
-- SCPs package to server
-- Extracts into timestamped release directory
-- Executes post-deploy scripts
-- Atomically switches current symlink
-- Optionally validates health endpoint
-- Releases lock
-- Rollback simply repoints the symlink.
+- Bumps `package.json` version.
+- Runs local pre-deploy scripts.
+- Creates build artifact.
+- Acquires lock.
+- SCPs package to server.
+- Extracts into timestamped release directory.
+- Executes post-deploy scripts.
+- Atomically switches current symlink.
+- Optionally validates health endpoint.
+- Releases lock.
+- Rollback, when needed. Simply re-points the symlink.
 
 ---
 
 ## How to Rollback
+
+Re-points the `current` release to the given deploy ID.
 
 ```sh
 bare rollback [id]
@@ -250,6 +256,8 @@ bare rollback [id]
 
 ## How to List Releases
 
+Lists all the existing deploy artifacts in the server.
+
 ```sh
 bare list
 ```
@@ -257,6 +265,8 @@ bare list
 ---
 
 ## How to Clean-up Old Releases
+
+Purges historical deploy artifacts from the server while preserving the last `X` number of deploys, defined by `keepReleases` option.
 
 ```sh
 bare cleanup
@@ -273,7 +283,7 @@ Containers are powerful, but for many SaaS teams running on VPS, they introduce:
 - Orchestration complexity
 - Operational abstraction
 
-Bare keeps the deployment model aligned with the host filesystem and process manager.
+Bare Deploy keeps the deployment model aligned with the host filesystem and process manager.
 
 ---
 

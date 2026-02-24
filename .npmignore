@@ -1,5 +1,7 @@
 node_modules/
+tests/
 dist/
 
+AGENTS.md
 bare.config.json
 .editorconfig

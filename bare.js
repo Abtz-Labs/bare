@@ -666,6 +666,7 @@ async function rollback(version) {
 function init() {
   const configPath = path.join(process.cwd(), "bare.config.json");
   const pkgPath = path.join(process.cwd(), "package.json");
+  const gitignorePath = path.join(process.cwd(), ".gitignore");
 
   if (!fs.existsSync(pkgPath)) {
     log("warn", "No package.json found in current directory.");
@@ -683,6 +684,20 @@ function init() {
   if (fs.existsSync(configPath)) {
     log("error", "bare.config.json already exists in current directory");
     process.exit(1);
+  }
+
+  const gitignoreContent = fs.existsSync(gitignorePath)
+    ? fs.readFileSync(gitignorePath, "utf-8")
+    : "";
+
+  const hasConfigEntry = /^bare\.config\.json$/m.test(gitignoreContent);
+
+  if (!fs.existsSync(gitignorePath)) {
+    fs.writeFileSync(gitignorePath, "bare.config.json\n");
+    log("success", ".gitignore created with bare.config.json entry");
+  } else if (!hasConfigEntry) {
+    fs.writeFileSync(gitignorePath, gitignoreContent.trim() + "\nbare.config.json\n");
+    log("success", "Added bare.config.json to .gitignore");
   }
 
   const defaultConfig = {

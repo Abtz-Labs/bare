@@ -104,6 +104,12 @@ The files it creates looks like this 👇
 > [!NOTE]
 > Server-specific options (`distDir`, `deployTo`, `webroot`, `include`, `ignore`, `preScripts`, `postScripts`, `startScript`) allow deploying different parts of your project to different servers.
 
+> [!NOTE]
+> When running `bare init`:
+> - If `package.json` doesn't exist, it's created with version `0.1.0`
+> - If `.gitignore` doesn't exist, it's created with `bare.config.json`
+> - If `.gitignore` exists but doesn't contain `bare.config.json`, the entry is added automatically
+
 ---
 
 ## Configuration Options

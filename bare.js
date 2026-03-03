@@ -677,7 +677,7 @@ function init() {
 
     const defaultPkg = { version: "0.1.0" };
     fs.writeFileSync(pkgPath, JSON.stringify(defaultPkg, null, 2));
-    log("success", "package.json created with { \"version\": \"0.1.0\" }");
+    log("success", 'package.json created with { "version": "0.1.0" }');
   }
 
   if (fs.existsSync(configPath)) {
@@ -795,6 +795,49 @@ async function cleanup() {
 }
 
 // ------------------------------
+// VERSION CHECKER
+// ------------------------------
+
+function parseVersion(v) {
+  return v
+    .replace(/^v/, "")
+    .split(".")
+    .map((n) => parseInt(n, 10));
+}
+
+function isNewerVersion(current, latest) {
+  const cur = parseVersion(current);
+  const lat = parseVersion(latest);
+
+  for (let i = 0; i < 3; i++) {
+    if (lat[i] > cur[i]) return true;
+    if (lat[i] < cur[i]) return false;
+  }
+
+  return false;
+}
+
+async function checkForUpdate() {
+  try {
+    const currentVersion = getCliVersion();
+    const result = execSync("npm view bare-deploy version", {
+      stdio: "pipe",
+      encoding: "utf-8",
+    });
+    const latestVersion = result.trim();
+
+    if (isNewerVersion(currentVersion, latestVersion)) {
+      console.log("");
+      log("warn", `A new version of bare-deploy is available: ${latestVersion} (you're on ${currentVersion})`);
+      log("info", "Run: npm install -g @bare.js to update");
+      console.log("");
+    }
+  } catch {
+    // Silently fail if npm view fails (offline, registry issues, etc.)
+  }
+}
+
+// ------------------------------
 // COMMAND ROUTER
 // ------------------------------
 
@@ -802,6 +845,12 @@ async function cleanup() {
   if (options.queryVersion) {
     console.log(`Bare Deploy v${getCliVersion()}`);
     return;
+  }
+
+  const commandsWithVersionCheck = ["deploy", "list", "rollback", "cleanup"];
+
+  if (commandsWithVersionCheck.includes(command)) {
+    await checkForUpdate();
   }
 
   try {
@@ -874,4 +923,6 @@ export {
   rollback,
   cleanup,
   init,
+  isNewerVersion,
+  checkForUpdate,
 };

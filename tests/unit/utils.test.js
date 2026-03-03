@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { generateReleaseId, bumpVersion, buildZipCommand } from "../../bare.js";
+import {
+  generateReleaseId,
+  bumpVersion,
+  buildZipCommand,
+  isNewerVersion,
+} from "../../bare.js";
 import fs from "fs";
 import path from "path";
 
@@ -71,6 +76,36 @@ describe("utils", () => {
       const result = buildZipCommand("./dist", "archive.zip", config);
 
       expect(result).not.toContain("-x");
+    });
+  });
+
+  describe("isNewerVersion", () => {
+    it("returns true when latest is newer than current (patch)", () => {
+      expect(isNewerVersion("1.0.0", "1.0.1")).toBe(true);
+    });
+
+    it("returns true when latest is newer than current (minor)", () => {
+      expect(isNewerVersion("1.0.0", "1.1.0")).toBe(true);
+    });
+
+    it("returns true when latest is newer than current (major)", () => {
+      expect(isNewerVersion("1.0.0", "2.0.0")).toBe(true);
+    });
+
+    it("returns false when current is newer than latest", () => {
+      expect(isNewerVersion("1.0.2", "1.0.1")).toBe(false);
+    });
+
+    it("returns false when versions are equal", () => {
+      expect(isNewerVersion("1.0.0", "1.0.0")).toBe(false);
+    });
+
+    it("handles versions with v prefix", () => {
+      expect(isNewerVersion("v1.0.0", "v1.0.1")).toBe(true);
+    });
+
+    it("handles major version jump", () => {
+      expect(isNewerVersion("0.9.9", "1.0.0")).toBe(true);
     });
   });
 });

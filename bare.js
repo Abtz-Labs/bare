@@ -686,9 +686,7 @@ function init() {
     process.exit(1);
   }
 
-  const gitignoreContent = fs.existsSync(gitignorePath)
-    ? fs.readFileSync(gitignorePath, "utf-8")
-    : "";
+  const gitignoreContent = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, "utf-8") : "";
 
   const hasConfigEntry = /^bare\.config\.json$/m.test(gitignoreContent);
 
@@ -844,7 +842,7 @@ async function checkForUpdate() {
     if (isNewerVersion(currentVersion, latestVersion)) {
       console.log("");
       log("warn", `A new version of bare-deploy is available: ${latestVersion} (you're on ${currentVersion})`);
-      log("info", "Run: npm install -g @bare.js to update");
+      log("info", "Run: 'npm install -g bare-deploy' to update");
       console.log("");
     }
   } catch {

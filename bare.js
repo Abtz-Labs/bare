@@ -665,6 +665,20 @@ async function rollback(version) {
 
 function init() {
   const configPath = path.join(process.cwd(), "bare.config.json");
+  const pkgPath = path.join(process.cwd(), "package.json");
+
+  if (!fs.existsSync(pkgPath)) {
+    log("warn", "No package.json found in current directory.");
+    log("info", "");
+    log("info", "Bare uses package.json to manage deployment versions.");
+    log("info", "Each deploy will bump the version automatically.");
+    log("info", "Creating package.json with version 0.1.0...");
+    log("info", "");
+
+    const defaultPkg = { version: "0.1.0" };
+    fs.writeFileSync(pkgPath, JSON.stringify(defaultPkg, null, 2));
+    log("success", "package.json created with { \"version\": \"0.1.0\" }");
+  }
 
   if (fs.existsSync(configPath)) {
     log("error", "bare.config.json already exists in current directory");

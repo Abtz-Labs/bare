@@ -81,6 +81,44 @@ describe("CLI commands", () => {
       }
     });
 
+    it("creates package.json if missing with explanation", async () => {
+      const testInitDir = fs.mkdtempSync("/tmp/bare-init-test-");
+      const currentDir = process.cwd();
+
+      try {
+        process.chdir(testInitDir);
+        const { init } = await import("../../bare.js");
+        init();
+
+        expect(fs.existsSync("package.json")).toBe(true);
+        const pkg = JSON.parse(fs.readFileSync("package.json"));
+        expect(pkg.version).toBe("0.1.0");
+      } finally {
+        process.chdir(currentDir);
+        fs.rmSync(testInitDir, { recursive: true, force: true });
+      }
+    });
+
+    it("keeps existing package.json if present", async () => {
+      const testInitDir = fs.mkdtempSync("/tmp/bare-init-test-");
+      const currentDir = process.cwd();
+
+      try {
+        process.chdir(testInitDir);
+        fs.writeFileSync("package.json", JSON.stringify({ version: "2.0.0", name: "my-app" }, null, 2));
+
+        const { init } = await import("../../bare.js");
+        init();
+
+        const pkg = JSON.parse(fs.readFileSync("package.json"));
+        expect(pkg.version).toBe("2.0.0");
+        expect(pkg.name).toBe("my-app");
+      } finally {
+        process.chdir(currentDir);
+        fs.rmSync(testInitDir, { recursive: true, force: true });
+      }
+    });
+
     it("exits with error if config already exists", async () => {
       const { init } = await import("../../bare.js");
       expect(() => init()).toThrow();

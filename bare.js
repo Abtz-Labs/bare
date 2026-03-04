@@ -77,6 +77,7 @@ const command = args[0];
 const options = {
   dryRun: args.includes("--dry-run"),
   json: args.includes("--json"),
+  verbose: args.includes("--verbose") || args.includes("--debug"),
   parallel: !args.includes("--sequential"),
   versionBump: args.includes("--major") ? "major" : args.includes("--minor") ? "minor" : "patch",
   queryVersion: args.includes("--version") || args.includes("-v"),
@@ -155,6 +156,9 @@ function runLocal(cmd, description) {
   const message = description || `  - ${cmd}`;
 
   log("info", message);
+  if (options.verbose) {
+    console.log(`    command: ${cmd}`);
+  }
 
   if (options.dryRun) return;
 
@@ -174,6 +178,10 @@ function runSSH(server, cmd, description) {
   const message = description || `  - ${cmd}`;
 
   log("info", message);
+  if (options.verbose) {
+    console.log(`    target: ${server.user}@${server.host}`);
+    console.log(`    action: ${description || "running command"}`);
+  }
 
   if (options.dryRun) return;
 
@@ -196,6 +204,10 @@ function scpTo(server, localFile, remotePath) {
   const fullCmd = `${base} ${localFile} ${server.user}@${server.host}:${remotePath}`;
 
   log("info", `Uploading package...`);
+  if (options.verbose) {
+    console.log(`    from: ${localFile}`);
+    console.log(`    to: ${server.user}@${server.host}:${remotePath}`);
+  }
 
   if (options.dryRun) return;
 
@@ -950,6 +962,7 @@ Commands:
 Options:
   --dry-run         Simulate execution
   --json            JSON logging
+  --verbose         Show detailed operation info
   --sequential      Deploy server-by-server
   --patch           Bump patch version (default)
   --minor           Bump minor version

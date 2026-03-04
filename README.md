@@ -228,6 +228,7 @@ bare deploy [options]
 ```
   --dry-run         Simulate execution
   --json            JSON logging
+  --verbose         Show detailed operation info
   --sequential      Deploy server-by-server
   --patch           Bump patch version (default)
   --minor           Bump minor version

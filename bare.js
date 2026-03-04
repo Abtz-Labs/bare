@@ -900,6 +900,7 @@ async function checkForUpdate() {
 
 (async () => {
   if (options.queryVersion) {
+    await checkForUpdate();
     console.log(`Bare Deploy v${getCliVersion()}`);
     return;
   }

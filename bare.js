@@ -256,7 +256,8 @@ function bumpVersion(pkg, type = "patch") {
 function buildZipCommand(distDir, archive, config) {
   const includePatterns = config.include || [];
   const ignorePatterns = config.ignore || [".git/*"];
-  let zipCmd = `cd ${distDir} && zip -r ../${archive}`;
+  const archivePath = distDir === "./" ? `./${archive}` : `../${archive}`;
+  let zipCmd = `cd ${distDir} && zip -r ${archivePath}`;
 
   if (includePatterns.length > 0) {
     // If include patterns are specified, only zip those patterns

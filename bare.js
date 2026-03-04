@@ -50,7 +50,21 @@ function loadConfig() {
     process.exit(1);
   }
 
-  return JSON.parse(fs.readFileSync(file));
+  const config = JSON.parse(fs.readFileSync(file));
+
+  for (const server of config.servers) {
+    if (server.deployTo && !path.isAbsolute(server.deployTo)) {
+      log("error", `deployTo must be an absolute path, got: ${server.deployTo}`);
+      process.exit(1);
+    }
+
+    if (server.webroot && server.webroot.trim() && !path.isAbsolute(server.webroot)) {
+      log("error", `webroot must be an absolute path, got: ${server.webroot}`);
+      process.exit(1);
+    }
+  }
+
+  return config;
 }
 
 // ------------------------------
@@ -147,9 +161,9 @@ function runLocal(cmd, description) {
   try {
     return execSync(cmd, { stdio: "pipe" }).toString().trim();
   } catch (err) {
-    log("error", `Local command failed: ${description || cmd}`);
-    // Create a clean error without exposing the full command or stderr
-    const cleanError = new Error(`Local command failed: ${description || cmd}`);
+    const errorMsg = `Local command failed: ${description || cmd}`;
+    log("error", errorMsg);
+    const cleanError = new Error(errorMsg);
     throw cleanError;
   }
 }
@@ -166,11 +180,10 @@ function runSSH(server, cmd, description) {
   try {
     return execSync(fullCmd, { stdio: "pipe" }).toString().trim();
   } catch (err) {
-    log("error", `Command failed: ${description || cmd}`);
+    const errorMsg = `SSH command failed: ${description || cmd}`;
+    log("error", errorMsg);
 
-    // Create a clean error without exposing the full command or stderr
-    const cleanError = new Error(`SSH command failed`);
-
+    const cleanError = new Error(errorMsg);
     cleanError.host = server.host;
     cleanError.description = description;
 
@@ -190,11 +203,10 @@ function scpTo(server, localFile, remotePath) {
     execSync(fullCmd, { stdio: "pipe" });
     log("success", `Package uploaded successfully!`);
   } catch (err) {
-    log("error", `Upload failed to ${server.host}`);
+    const errorMsg = `Upload failed to ${server.host}`;
+    log("error", errorMsg);
 
-    // Create a clean error without exposing the full command or stderr
-    const cleanError = new Error(`Upload failed to ${server.host}`);
-
+    const cleanError = new Error(errorMsg);
     cleanError.host = server.host;
 
     throw cleanError;
@@ -335,7 +347,6 @@ async function deploy() {
       runSSH(server, `touch ${lockFile}`, "Acquiring lock");
 
       // Create base deploy directory and release directory
-      runSSH(server, `mkdir -p ${releaseBase}`, "Creating deploy directory");
       runSSH(server, `mkdir -p ${releaseDir}`, "Creating release directory");
 
       if (server.webroot) {
@@ -347,7 +358,17 @@ async function deploy() {
         );
 
         if (isDir === "dir") {
-          runSSH(server, `mv "${server.webroot}" "${server.webroot}.bak"`, "Backing up original webroot");
+          try {
+            runSSH(server, `mv "${server.webroot}" "${server.webroot}.bak"`, "Backing up original webroot");
+          } catch (err) {
+            const cleanError = new Error(
+              `Failed to backup webroot directory. The deploy user needs write permissions on the webroot directory. ` +
+              `Add the deploy user to the www-data group: sudo usermod -a -G www-data ${server.user}`,
+            );
+            cleanError.host = server.host;
+            cleanError.description = "Backing up original webroot";
+            throw cleanError;
+          }
         }
       }
 
@@ -400,6 +421,22 @@ async function deploy() {
       // Update symlink BEFORE running postScripts so they operate on the new release
       runSSH(server, `ln -sfn ${releaseDir} ${releaseBase}/current`, "Activating new release");
 
+      // Create webroot symlink if configured
+      if (server.webroot) {
+        const webrootCmd = `rm -rf "${server.webroot}" && ln -sfn ${releaseBase}/current "${server.webroot}"`;
+        try {
+          runSSH(server, webrootCmd, "Creating webroot symlink");
+        } catch (err) {
+          const cleanError = new Error(
+            `Failed to create webroot symlink. The deploy user needs write permissions on the webroot directory. ` +
+            `Add the deploy user to the www-data group: sudo usermod -a -G www-data ${server.user}`,
+          );
+          cleanError.host = server.host;
+          cleanError.description = "Creating webroot symlink";
+          throw cleanError;
+        }
+      }
+
       if (server.postScripts && server.postScripts.length) {
         log("info", "Running post-scripts...");
 
@@ -430,7 +467,7 @@ async function deploy() {
 
       log("success", `Deploy successful on ${server.host}!`);
     } catch (err) {
-      log("error", `Deploy failed on ${server.host}`);
+      log("error", `Deploy failed on ${server.host}: ${err.message}`);
 
       // Rollback version in package.json
       if (!options.dryRun) {
@@ -625,11 +662,18 @@ async function rollback(version) {
       );
 
       if (server.webroot) {
-        runSSH(
-          server,
-          `rm -rf "${server.webroot}" 2>/dev/null || true && ln -sfn ${releaseBase}/current "${server.webroot}"`,
-          "Updating webroot symlink",
-        );
+        const webrootCmd = `rm -rf "${server.webroot}" && ln -sfn ${releaseBase}/current "${server.webroot}"`;
+        try {
+          runSSH(server, webrootCmd, "Updating webroot symlink");
+        } catch (err) {
+          const cleanError = new Error(
+            `Failed to update webroot symlink. The deploy user needs write permissions on the webroot directory. ` +
+            `Add the deploy user to the www-data group: sudo usermod -a -G www-data ${server.user}`,
+          );
+          cleanError.host = server.host;
+          cleanError.description = "Updating webroot symlink";
+          throw cleanError;
+        }
       }
 
       runSSH(
@@ -643,7 +687,7 @@ async function rollback(version) {
 
       log("success", `Rollback completed on ${server.host}`);
     } catch (err) {
-      log("error", `Release ${version} may not exist on ${server.host}`);
+      log("error", `Rollback failed on ${server.host}: ${err.message}`);
       throw err;
     }
   };

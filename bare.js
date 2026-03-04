@@ -363,7 +363,7 @@ async function deploy() {
           } catch (err) {
             const cleanError = new Error(
               `Failed to backup webroot directory. The deploy user needs write permissions on the webroot directory. ` +
-              `Add the deploy user to the www-data group: sudo usermod -a -G www-data ${server.user}`,
+                `Add the deploy user to the www-data group: sudo usermod -a -G www-data ${server.user}`,
             );
             cleanError.host = server.host;
             cleanError.description = "Backing up original webroot";
@@ -429,7 +429,7 @@ async function deploy() {
         } catch (err) {
           const cleanError = new Error(
             `Failed to create webroot symlink. The deploy user needs write permissions on the webroot directory. ` +
-            `Add the deploy user to the www-data group: sudo usermod -a -G www-data ${server.user}`,
+              `Add the deploy user to the www-data group: sudo usermod -a -G www-data ${server.user}`,
           );
           cleanError.host = server.host;
           cleanError.description = "Creating webroot symlink";
@@ -668,7 +668,7 @@ async function rollback(version) {
         } catch (err) {
           const cleanError = new Error(
             `Failed to update webroot symlink. The deploy user needs write permissions on the webroot directory. ` +
-            `Add the deploy user to the www-data group: sudo usermod -a -G www-data ${server.user}`,
+              `Add the deploy user to the www-data group: 'sudo usermod -a -G www-data ${server.user}'`,
           );
           cleanError.host = server.host;
           cleanError.description = "Updating webroot symlink";
@@ -753,7 +753,7 @@ function init() {
         deployTo: "/var/www/app",
         webroot: "",
         include: [],
-        ignore: [".git/*"],
+        ignore: [],
         preScripts: [],
         postScripts: [],
         startScript: "pm2 restart --env production --update-env",

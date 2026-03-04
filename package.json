@@ -1,6 +1,6 @@
 {
   "name": "bare-deploy",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Atomic zero-downtime deployments to bare VPS servers over SSH. No containers required.",
   "keywords": [
     "deployment",

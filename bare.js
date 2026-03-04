@@ -174,13 +174,15 @@ function runLocal(cmd, description) {
 
 function runSSH(server, cmd, description) {
   const base = buildSSHBase(server);
-  const fullCmd = `${base} '${cmd}'`;
+  const escapedCmd = cmd.replace(/'/g, "'\\''");
+  const fullCmd = `${base} '${escapedCmd}'`;
   const message = description || `  - ${cmd}`;
 
   log("info", message);
   if (options.verbose) {
     console.log(`    target: ${server.user}@${server.host}`);
     console.log(`    action: ${description || "running command"}`);
+    console.log(`    command: ${cmd}`);
   }
 
   if (options.dryRun) return;
@@ -188,12 +190,22 @@ function runSSH(server, cmd, description) {
   try {
     return execSync(fullCmd, { stdio: "pipe" }).toString().trim();
   } catch (err) {
+    const stderr = err.stderr ? err.stderr.toString().trim() : "";
     const errorMsg = `SSH command failed: ${description || cmd}`;
+    
+    if (options.verbose && stderr) {
+      console.log(`    stderr: ${stderr}`);
+    }
+    
     log("error", errorMsg);
+    if (stderr && !options.verbose) {
+      log("error", `  stderr: ${stderr}`);
+    }
 
     const cleanError = new Error(errorMsg);
     cleanError.host = server.host;
     cleanError.description = description;
+    cleanError.stderr = stderr;
 
     throw cleanError;
   }

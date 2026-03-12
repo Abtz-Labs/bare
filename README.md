@@ -11,7 +11,7 @@
 [![npm downloads](https://img.shields.io/npm/dt/bare-deploy.svg)](https://www.npmjs.com/package/bare-deploy)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Atomic zero-downtime deployments to **bare VPS servers** over SSH.
+Atomic zero-downtime deployments to **bare VPS** (Virtual Private Server) over SSH.
 
 - No containers.
 - No agents.
@@ -139,81 +139,27 @@ Each server in the `servers` array can have its own configuration:
 }
 ```
 
-#### `servers[].distDir`
-
-The directory where the content to package for deployment lives on (default: `"./dist"`).
-
-#### `servers[].deployTo`
-
-The base path **on the server** where deployments are stored. Bare Deploy creates a `releases/` subfolder with timestamped versions.
-
-#### `servers[].webroot`
-
-Optional. Path to the web server's document root. When set:
-
-- On first deploy: backs up existing `webroot` to `{webroot}.bak`, then creates a symlink
-- Automatically copies `.well-known/` (Let's Encrypt) from previous deployment
-- Creates symlink: `webroot` → `releases/current`
-
-#### `servers[].preScripts`
-
-Optional. Array of commands to **run locally** before building the deployment package.
-
-#### `servers[].postScripts`
-
-Optional. Array of commands to **run on the server** after deployment but before switching the symlink.
-
-#### `servers[].startScript`
-
-Optional. Command to run after symlink switch. Useful for process managers like PM2.
-
-#### `servers[].include`
-
-Optional. Array of file patterns to include in the deployment package for this server. When specified, only matching files are packaged. Supports glob patterns. Falls back to global `include` if not set.
-
-**Example**:
-```json
-{
-  "include": ["*.js", "*.json", "views/*", "public/*"]
-}
-```
-
-> [!NOTE]
-> When using `include`, remember to add `".*"` if you need hidden files (like `.env.production`).
-
-#### `servers[].ignore`
-
-Optional. Array of file patterns to exclude from the deployment package for this server (default: `[".git/*"]`). Applied after `include` patterns. Falls back to global `ignore` if not set.
-
-**Example**:
-```json
-{
-  "ignore": [".git/*", "*.log", "test/*", "*.test.js"]
-}
-```
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `servers[].distDir` | Yes | `"./dist"` | Directory where the content to package for deployment lives. |
+| `servers[].deployTo` | Yes | | Base path **on the server** where deployments are stored. Bare Deploy creates a `releases/` subfolder with timestamped versions. |
+| `servers[].webroot` | No | `Empty` | Path to the web server's document root. On first deploy, backs up existing `webroot` to `{webroot}.bak` and creates a symlink. Automatically copies `.well-known/` (Let's Encrypt) from the previous deployment. |
+| `servers[].preScripts` | No | `[]` | Array of commands to **run locally** before building the deployment package. |
+| `servers[].postScripts` | No | `[]` | Array of commands to **run on the server** after deployment but before switching the symlink. |
+| `servers[].startScript` | No | `Empty` | Command to run after symlink switch. Useful for process managers like PM2. |
+| `servers[].include` | No | `Empty` | Array of glob patterns to include in the deployment package. When specified, only matching files are packaged. Falls back to global `include` if not set. Add `".*"` to include hidden files like `.env.production`. |
+| `servers[].ignore` | No | `[]` | Array of glob patterns to exclude from the deployment package. Applied after `include` patterns. Falls back to global `ignore` if not set. |
 
 ### Global Options
 
-#### `include`
-
-Optional. Global array of file patterns to include in the deployment package. Used as fallback when not defined per-server.
-
-#### `ignore`
-
-Optional. Global array of file patterns to exclude from the deployment package (default: `[".git/*"]`). Used as fallback when not defined per-server.
-
-#### `keepReleases`
-
-Optional. Number of releases to keep on the server as history (default: `5`).
-
-#### `healthCheck`
-
-Optional. When set, runs at the very end, after running all the deploy steps to make sure your deploy was successful. If health check fails, the deploy is automatically rolled back to its previous version.
-
-Health check configuration:
-
-- `url`: URL to check after deployment
-- `timeout`: Seconds to wait (default: `15`)
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `include` | No | `[]` | Array of glob patterns to include in the deployment package. Used as fallback when not defined per-server. |
+| `ignore` | No | `[".git/*"]` | Array of glob patterns to exclude from the deployment package. Used as fallback when not defined per-server. |
+| `keepReleases` | No | `5` | Number of releases to keep on the server as history. |
+| `healthCheck` | No | `{}` | Runs after all deploy steps to validate the deployment. If it fails, the deploy is automatically rolled back. Accepts `url` (URL to check) and `timeout` (seconds to wait, default `15`). |
+| `healthCheck.url` | `Empty` | The URL to check after deployment. |
+| `healthCheck.timeout` | `15` | Seconds to wait for the health check to succeed. |
 
 ---
 
@@ -294,6 +240,6 @@ Bare Deploy keeps the deployment model aligned with the host filesystem and proc
 
 ---
 
-Bare Deploy is built and supported by [Abtz Labs](https://abtz.co?ref=Bare+Deploy), the same people behind [Abtz Analytics](https://analytics.abtz.co?ref=Bare+Deploy), [KiwiCart](https://kiwicart.xyz?ref=Bare+Deploy), and others. It's opinionated, FREE, and open-source --distributed under [MIT](./LICENSE) license.
+Bare Deploy is built and supported by [Abtz Labs](https://abtz.co?ref=Bare+Deploy), the same people behind [Abtz Analytics](https://analytics.abtz.co?ref=Bare+Deploy), [KiwiCart](https://kiwicart.xyz?ref=Bare+Deploy), and others. It's opinionated, FREE, and open-source. Distributed under [MIT](./LICENSE) license.
 
 MIT © Abtz Labs

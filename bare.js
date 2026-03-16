@@ -446,6 +446,11 @@ async function deploy() {
       // Update symlink BEFORE running postScripts so they operate on the new release
       runSSH(server, `ln -sfn ${releaseDir} ${releaseBase}/current`, "Activating new release");
 
+      // Create previous symlink if there was a previous release
+      if (previousReleaseForRollback && previousReleaseForRollback.trim() !== "") {
+        runSSH(server, `ln -sfn ${previousReleaseForRollback} ${releaseBase}/previous`, "Creating previous symlink");
+      }
+
       // Create webroot symlink if configured
       if (server.webroot) {
         const webrootCmd = `rm -rf "${server.webroot}" && ln -sfn ${releaseBase}/current "${server.webroot}"`;
@@ -532,6 +537,27 @@ async function deploy() {
               `ln -sfn ${previousReleaseForRollback} ${releaseBase}/current`,
               "Reverting symlink to previous release",
             );
+
+            // Get all releases to find the version before rollback target
+            const allReleases = runSSH(
+              server,
+              `ls -1 ${releaseBase} | grep -v '^current$' | grep -v '^previous$' | sort`,
+              "Listing all releases for previous update",
+            );
+
+            const releases = allReleases.split("\n").filter((r) => r.trim());
+            const rollbackTarget = previousReleaseForRollback.split("/").pop();
+            const rollbackIndex = releases.indexOf(rollbackTarget);
+
+            // Update previous to version before rollback target if available
+            if (rollbackIndex > 0) {
+              const versionBeforeRollback = releases[rollbackIndex - 1];
+              runSSH(
+                server,
+                `ln -sfn ${releaseBase}/${versionBeforeRollback} ${releaseBase}/previous`,
+                "Updating previous to version before rollback target",
+              );
+            }
 
             // Re-run startScript for rollback
             if (server.startScript) {
@@ -678,6 +704,23 @@ async function rollback(version) {
     }
 
     try {
+      // Get current and previous symlinks before rollback
+      const currentBeforeRollback = runSSH(
+        server,
+        `readlink ${releaseBase}/current 2>/dev/null || echo ""`,
+        "Getting current symlink target",
+      );
+
+      // Get the version before the rollback target
+      const allReleases = runSSH(
+        server,
+        `ls -1 ${releaseBase} | grep -v '^current$' | grep -v '^previous$' | sort`,
+        "Listing all releases",
+      );
+
+      const releases = allReleases.split("\n").filter((r) => r.trim());
+      const rollbackIndex = releases.indexOf(version);
+
       runSSH(
         server,
         `
@@ -685,6 +728,26 @@ async function rollback(version) {
       `,
         `Rolling back to ${version}`,
       );
+
+      // Update previous symlink: previous becomes current, then update to 1 version before rollback target
+      if (currentBeforeRollback && currentBeforeRollback.trim() !== "") {
+        // First set previous to what current was (for the "previous becomes current" behavior)
+        runSSH(
+          server,
+          `ln -sfn ${currentBeforeRollback} ${releaseBase}/previous`,
+          "Updating previous symlink to previous current",
+        );
+      }
+
+      // Then update previous to 1 version before the rollback target if available
+      if (rollbackIndex > 0) {
+        const versionBeforeRollback = releases[rollbackIndex - 1];
+        runSSH(
+          server,
+          `ln -sfn ${releaseBase}/${versionBeforeRollback} ${releaseBase}/previous`,
+          "Updating previous to version before rollback target",
+        );
+      }
 
       if (server.webroot) {
         const webrootCmd = `rm -rf "${server.webroot}" && ln -sfn ${releaseBase}/current "${server.webroot}"`;

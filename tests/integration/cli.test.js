@@ -149,6 +149,39 @@ describe("CLI commands", () => {
       await deploy();
     });
 
+    it("does not create previous symlink on first deploy", async () => {
+      let previousSymlinkCreated = false;
+
+      execSync.mockImplementation((cmd) => {
+        if (cmd.includes("zip")) {
+          return Buffer.from("");
+        }
+        if (cmd.includes("scp")) {
+          return Buffer.from("");
+        }
+        if (cmd.includes("ssh")) {
+          if (cmd.includes("mkdir")) return Buffer.from("");
+          if (cmd.includes("unzip")) return Buffer.from("");
+          if (cmd.includes("curl")) return Buffer.from("");
+          if (cmd.includes("readlink") && cmd.includes("current")) {
+            return Buffer.from("");
+          }
+          if (cmd.includes("ln -sfn") && cmd.includes("previous")) {
+            previousSymlinkCreated = true;
+            return Buffer.from("");
+          }
+          if (cmd.includes("ln -sfn")) return Buffer.from("");
+          return Buffer.from("");
+        }
+        return Buffer.from("");
+      });
+
+      const { deploy } = await import("../../bare.js");
+      await deploy();
+
+      expect(previousSymlinkCreated).toBe(false);
+    });
+
     it("exits with error if config missing", async () => {
       const currentDir = process.cwd();
       fs.rmSync("bare.config.json");
@@ -280,6 +313,10 @@ describe("CLI commands", () => {
   });
 
   describe("rollback", () => {
+    beforeEach(() => {
+      vi.mocked(execSync).mockReset();
+    });
+
     it("rolls back to specified release", async () => {
       execSync.mockImplementation((cmd) => {
         if (cmd.includes("ln -sfn")) return Buffer.from("");
@@ -288,6 +325,35 @@ describe("CLI commands", () => {
 
       const { rollback } = await import("../../bare.js");
       await rollback("20260220123456-v1.0.1");
+    });
+
+    it("updates previous symlink when rolling back", async () => {
+      let previousSymlinkUpdated = false;
+
+      const { options } = await import("../../bare.js");
+      options.dryRun = false;
+
+      execSync.mockImplementation((cmd) => {
+        if (cmd.includes("readlink") && cmd.includes("current")) {
+          return Buffer.from("/var/www/app/releases/20260220150000-v1.0.2");
+        }
+        if (cmd.includes("ls -1") && cmd.includes("sort")) {
+          return Buffer.from("20260220123456-v1.0.1\n20260220150000-v1.0.2");
+        }
+        if (cmd.includes("ln -sfn") && cmd.includes("/previous")) {
+          previousSymlinkUpdated = true;
+          return Buffer.from("");
+        }
+        if (cmd.includes("ln -sfn")) return Buffer.from("");
+        return Buffer.from("");
+      });
+
+      const { rollback } = await import("../../bare.js");
+      await rollback("20260220123456-v1.0.1");
+
+      expect(previousSymlinkUpdated).toBe(true);
+
+      options.dryRun = true;
     });
 
     it("exits with error if no version provided", async () => {

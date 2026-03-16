@@ -106,6 +106,7 @@ The files it creates looks like this 👇
 
 > [!NOTE]
 > When running `bare init`:
+>
 > - If `package.json` doesn't exist, it's created with version `0.1.0`
 > - If `.gitignore` doesn't exist, it's created with `bare.config.json`
 > - If `.gitignore` exists but doesn't contain `bare.config.json`, the entry is added automatically
@@ -132,7 +133,7 @@ Each server in the `servers` array can have its own configuration:
       "preScripts": [],
       "postScripts": [],
       "startScript": "pm2 restart --env production --update-env"
-    },
+    }
 
     // ...
   ]
@@ -199,11 +200,28 @@ bare deploy [options]
 
 ## How to Rollback
 
-Re-points the `current` release to the given deploy ID.
+Re-points the `current` release to the given deploy ID. Also updates the `previous` symlink to point to the version before the rollback target.
 
 ```sh
 bare rollback [id]
 ```
+
+### Symlinks
+
+Bare Deploy manages three symlinks in your releases directory:
+
+- `current` - Points to the active release
+- `previous` - Points to the previous release (one version before current)
+
+After each deploy:
+
+- `current` → new release
+- `previous` → previous release (what `current` was before)
+
+After each rollback:
+
+- `current` → rolled back release
+- `previous` → version before the rolled back release, if any
 
 ---
 

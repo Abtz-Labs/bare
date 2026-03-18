@@ -312,22 +312,22 @@ describe("CLI commands", () => {
     });
   });
 
-  describe("rollback", () => {
+  describe("use", () => {
     beforeEach(() => {
       vi.mocked(execSync).mockReset();
     });
 
-    it("rolls back to specified release", async () => {
+    it("uses specified release", async () => {
       execSync.mockImplementation((cmd) => {
         if (cmd.includes("ln -sfn")) return Buffer.from("");
         return Buffer.from("");
       });
 
-      const { rollback } = await import("../../bare.js");
-      await rollback("20260220123456-v1.0.1");
+      const { use } = await import("../../bare.js");
+      await use("20260220123456-v1.0.1");
     });
 
-    it("updates previous symlink when rolling back", async () => {
+    it("updates previous symlink when using a release", async () => {
       let previousSymlinkUpdated = false;
 
       const { options } = await import("../../bare.js");
@@ -348,8 +348,8 @@ describe("CLI commands", () => {
         return Buffer.from("");
       });
 
-      const { rollback } = await import("../../bare.js");
-      await rollback("20260220123456-v1.0.1");
+      const { use } = await import("../../bare.js");
+      await use("20260220123456-v1.0.1");
 
       expect(previousSymlinkUpdated).toBe(true);
 
@@ -357,8 +357,8 @@ describe("CLI commands", () => {
     });
 
     it("exits with error if no version provided", async () => {
-      const { rollback } = await import("../../bare.js");
-      await expect(rollback()).rejects.toThrow();
+      const { use } = await import("../../bare.js");
+      await expect(use()).rejects.toThrow();
     });
 
     it("works without package.json (only needs bare.config.json)", async () => {
@@ -387,8 +387,8 @@ describe("CLI commands", () => {
         };
         fs.writeFileSync(path.join(noPkgDir, "bare.config.json"), JSON.stringify(config, null, 2));
         process.chdir(noPkgDir);
-        const { rollback } = await import("../../bare.js");
-        await expect(rollback("20260220123456-v1.0.1")).resolves.not.toThrow();
+        const { use } = await import("../../bare.js");
+        await expect(use("20260220123456-v1.0.1")).resolves.not.toThrow();
       } finally {
         process.chdir(currentDir);
         fs.rmSync(noPkgDir, { recursive: true, force: true });

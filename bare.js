@@ -715,14 +715,16 @@ async function use(version) {
     const releaseBase = `${base}/releases`;
 
     if (options.dryRun) {
-      log("info", `Rolling back to ${version}...`);
+      log("info", `Using release ${version}...`);
 
       if (server.webroot) {
         log("info", "Updating webroot symlink...");
       }
 
-      log("info", "Running start script for rolled back release...");
-      log("success", `Rollback completed on ${server.host}`);
+      if (server.startScript) {
+        log("info", "Running start script...");
+      }
+      log("success", `Use completed on ${server.host}`);
 
       return;
     }
@@ -750,7 +752,7 @@ async function use(version) {
         `
         ln -sfn ${releaseBase}/${version} ${releaseBase}/current
       `,
-        `Rolling back to ${version}`,
+        `Updating current symlink to ${version}`,
       );
 
       // Update previous symlink: previous becomes current, then update to 1 version before rollback target
@@ -788,18 +790,13 @@ async function use(version) {
         }
       }
 
-      runSSH(
-        server,
-        `
-        cd ${releaseBase}/current &&
-        ${server.startScript ?? "echo 'No restart script"}
-      `,
-        "Running start script for rolled back release",
-      );
+      if (server.startScript) {
+        runSSH(server, `cd ${releaseBase}/current && ${server.startScript}`, "Running start script");
+      }
 
-      log("success", `Rollback completed on ${server.host}`);
+      log("success", `Use completed on ${server.host}`);
     } catch (err) {
-      log("error", `Rollback failed on ${server.host}: ${err.message}`);
+      log("error", `Use failed on ${server.host}: ${err.message}`);
       throw err;
     }
   };

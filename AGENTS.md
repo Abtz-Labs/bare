@@ -215,3 +215,4 @@ Before adding any npm dependency:
 - Verify rollback functionality
 - Check error messages are user-friendly and secure
 - Test webroot functionality (if modified) with Let's Encrypt `.well-known` preservation
+- Update tests when needed. Prefer TDD.

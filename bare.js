@@ -666,11 +666,7 @@ function listReleases() {
         "",
       );
 
-      const currentRelease = runSSH(
-        server,
-        `readlink ${server.deployTo}/releases/current 2>/dev/null || echo ""`,
-        "",
-      );
+      const currentRelease = runSSH(server, `readlink ${server.deployTo}/releases/current 2>/dev/null || echo ""`, "");
 
       const previousRelease = runSSH(
         server,
@@ -706,15 +702,15 @@ function listReleases() {
 // ROLLBACK
 // ------------------------------
 
-async function rollback(version) {
+async function use(version) {
   if (!version) {
-    log("error", "Rollback requires release id.");
+    log("error", "Use requires release id.");
     process.exit(1);
   }
 
   const config = loadConfig();
 
-  const rollbackServer = async (server) => {
+  const useServer = async (server) => {
     const base = server.deployTo;
     const releaseBase = `${base}/releases`;
 
@@ -809,14 +805,14 @@ async function rollback(version) {
   };
 
   if (options.parallel) {
-    await Promise.all(config.servers.map(rollbackServer));
+    await Promise.all(config.servers.map(useServer));
   } else {
     for (const server of config.servers) {
-      await rollbackServer(server);
+      await useServer(server);
     }
   }
 
-  log("success", `Rolled back to ${version}`);
+  log("success", `Using release ${version}`);
 }
 
 // ------------------------------
@@ -1021,7 +1017,7 @@ async function checkForUpdate() {
     return;
   }
 
-  const commandsWithVersionCheck = ["deploy", "list", "rollback", "cleanup"];
+  const commandsWithVersionCheck = ["deploy", "list", "use", "cleanup"];
 
   if (commandsWithVersionCheck.includes(command)) {
     await checkForUpdate();
@@ -1038,8 +1034,9 @@ async function checkForUpdate() {
       case "list":
         listReleases();
         break;
-      case "rollback":
-        rollback(args[1]);
+      case "rollback": // for backward compatibility
+      case "use":
+        use(args[1]);
         break;
       case "cleanup":
         cleanup();
@@ -1059,7 +1056,7 @@ Commands:
   init              Create bare.config.json file
   deploy            Run deployment
   list              List releases
-  rollback <id>     Rollback to release
+  use <id>          Use a specific release
   cleanup           Remove old releases
 
 Options:
@@ -1095,7 +1092,7 @@ export {
   scpTo,
   deploy,
   listReleases,
-  rollback,
+  use,
   cleanup,
   init,
   isNewerVersion,

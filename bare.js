@@ -192,11 +192,11 @@ function runSSH(server, cmd, description) {
   } catch (err) {
     const stderr = err.stderr ? err.stderr.toString().trim() : "";
     const errorMsg = `SSH command failed: ${description || cmd}`;
-    
+
     if (options.verbose && stderr) {
       console.log(`    stderr: ${stderr}`);
     }
-    
+
     log("error", errorMsg);
     if (stderr && !options.verbose) {
       log("error", `  stderr: ${stderr}`);
@@ -651,22 +651,48 @@ function listReleases() {
       if (options.dryRun) {
         log("info", "Listing releases...");
         log("success", `Releases on ${server.host}:`);
-        console.log("20260220123456-v1.0.1\n20260220150000-v1.0.2\n20260220162341-v1.0.3");
+        console.log("20260220123456-v1.0.1");
+        console.log("20260220150000-v1.0.2  (previous)");
+        console.log("20260220162341-v1.0.3  (current)");
 
         return;
       }
 
       const releases = runSSH(
         server,
-        `ls -1 ${server.deployTo}/releases 2>/dev/null | grep -v '^current$' || echo "No releases found"`,
+        `ls -1 ${server.deployTo}/releases 2>/dev/null | grep -v '^current$' | grep -v '^previous$' || echo "No releases found"`,
         "Listing releases",
+      );
+
+      const currentRelease = runSSH(
+        server,
+        `readlink ${server.deployTo}/releases/current 2>/dev/null || echo ""`,
+        "Getting current release",
+      );
+
+      const previousRelease = runSSH(
+        server,
+        `readlink ${server.deployTo}/releases/previous 2>/dev/null || echo ""`,
+        "Getting previous release",
       );
 
       if (releases === "No releases found") {
         log("info", `No releases found on ${server.host}`);
       } else {
         log("success", `Releases on ${server.host}:`);
-        console.log(releases);
+        const releaseList = releases.split("\n").filter((r) => r.trim());
+        const currentName = currentRelease ? currentRelease.split("/").pop() : "";
+        const previousName = previousRelease ? previousRelease.split("/").pop() : "";
+
+        releaseList.forEach((release) => {
+          let suffix = "";
+          if (release === currentName) {
+            suffix = "  (current)";
+          } else if (release === previousName) {
+            suffix = "  (previous)";
+          }
+          console.log(`${release}${suffix}`);
+        });
       }
     } catch (err) {
       log("error", `Failed to list releases on ${server.host}`);
@@ -873,7 +899,7 @@ async function cleanup() {
         server,
         `
         cd ${server.deployTo}/releases &&
-        ls -1 | grep -v '^current$' | sort -r | tail -n +${config.keepReleases + 1}
+        ls -1 | grep -v '^current$' | grep -v '^previous$' | sort -r | tail -n +${config.keepReleases + 1}
       `,
         "Finding old releases",
       );
@@ -897,7 +923,7 @@ async function cleanup() {
         server,
         `
         cd ${server.deployTo}/releases &&
-        ls -1 | grep -v '^current$' | sort -r | tail -n +${config.keepReleases + 1}
+        ls -1 | grep -v '^current$' | grep -v '^previous$' | sort -r | tail -n +${config.keepReleases + 1}
       `,
         "Finding old releases",
       );
@@ -914,7 +940,7 @@ async function cleanup() {
           server,
           `
           cd ${server.deployTo}/releases &&
-          ls -1 | grep -v '^current$' | sort -r | tail -n +${config.keepReleases + 1} | xargs -r rm -rf
+          ls -1 | grep -v '^current$' | grep -v '^previous$' | sort -r | tail -n +${config.keepReleases + 1} | xargs -r rm -rf
         `,
           "Cleaning up old releases",
         );

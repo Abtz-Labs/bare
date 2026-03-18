@@ -176,9 +176,11 @@ function runSSH(server, cmd, description) {
   const base = buildSSHBase(server);
   const escapedCmd = cmd.replace(/'/g, "'\\''");
   const fullCmd = `${base} '${escapedCmd}'`;
-  const message = description || `  - ${cmd}`;
+  const message = description !== undefined ? description : `  - ${cmd}`;
 
-  log("info", message);
+  if (message) {
+    log("info", message);
+  }
   if (options.verbose) {
     console.log(`    target: ${server.user}@${server.host}`);
     console.log(`    action: ${description || "running command"}`);
@@ -661,19 +663,19 @@ function listReleases() {
       const releases = runSSH(
         server,
         `ls -1 ${server.deployTo}/releases 2>/dev/null | grep -v '^current$' | grep -v '^previous$' || echo "No releases found"`,
-        "Listing releases",
+        "",
       );
 
       const currentRelease = runSSH(
         server,
         `readlink ${server.deployTo}/releases/current 2>/dev/null || echo ""`,
-        "Getting current release",
+        "",
       );
 
       const previousRelease = runSSH(
         server,
         `readlink ${server.deployTo}/releases/previous 2>/dev/null || echo ""`,
-        "Getting previous release",
+        "",
       );
 
       if (releases === "No releases found") {

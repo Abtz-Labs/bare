@@ -222,7 +222,7 @@ describe("CLI commands", () => {
         fs.writeFileSync(path.join(noPkgDir, "bare.config.json"), JSON.stringify(config, null, 2));
         process.chdir(noPkgDir);
         const { deploy } = await import("../../bare.js");
-        await expect(deploy()).rejects.toThrow(/package\.json not found/);
+        await expect(deploy()).rejects.toThrow(/\nFile \'package\.json\' not found\.\nRun in a project directory that contains a 'package\.json' file\.\n/);
       } finally {
         process.chdir(currentDir);
         fs.rmSync(noPkgDir, { recursive: true, force: true });
@@ -241,40 +241,6 @@ describe("CLI commands", () => {
 
       const { listReleases } = await import("../../bare.js");
       listReleases();
-    });
-
-    it("exits with error if package.json missing", async () => {
-      const currentDir = process.cwd();
-      const noPkgDir = fs.mkdtempSync("/tmp/bare-no-pkg-");
-
-      try {
-        const config = {
-          servers: [
-            {
-              host: "test-server.example.com",
-              user: "deploy",
-              port: 22,
-              identityFile: "~/.ssh/id_rsa",
-              distDir: "./dist",
-              deployTo: "/var/www/app",
-              webroot: "",
-              include: [],
-              ignore: [".git/*"],
-              preScripts: [],
-              postScripts: [],
-              startScript: "pm2 restart app",
-            },
-          ],
-          keepReleases: 5,
-        };
-        fs.writeFileSync(path.join(noPkgDir, "bare.config.json"), JSON.stringify(config, null, 2));
-        process.chdir(noPkgDir);
-        const { deploy } = await import("../../bare.js");
-        await expect(deploy()).rejects.toThrow(/package\.json not found/);
-      } finally {
-        process.chdir(currentDir);
-        fs.rmSync(noPkgDir, { recursive: true, force: true });
-      }
     });
 
     it("works without package.json (only needs bare.config.json)", async () => {

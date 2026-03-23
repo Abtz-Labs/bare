@@ -52,6 +52,7 @@ Inspired by the simplicity of [Kamal](https://kamal-deploy.org/), but designed f
 - Rollback support
 - Release pruning
 - Support for static sites with Let's Encrypt preservation
+- Automatic ignore of files in `.gitignore` (except the build output directory)
 
 ---
 
@@ -140,27 +141,27 @@ Each server in the `servers` array can have its own configuration:
 }
 ```
 
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `servers[].distDir` | Yes | `"./dist"` | Directory where the content to package for deployment lives. |
-| `servers[].deployTo` | Yes | | Base path **on the server** where deployments are stored. Bare Deploy creates a `releases/` subfolder with timestamped versions. |
-| `servers[].webroot` | No | `Empty` | Path to the web server's document root. On first deploy, backs up existing `webroot` to `{webroot}.bak` and creates a symlink. Automatically copies `.well-known/` (Let's Encrypt) from the previous deployment. |
-| `servers[].preScripts` | No | `[]` | Array of commands to **run locally** before building the deployment package. |
-| `servers[].postScripts` | No | `[]` | Array of commands to **run on the server** after deployment but before switching the symlink. |
-| `servers[].startScript` | No | `Empty` | Command to run after symlink switch. Useful for process managers like PM2. |
-| `servers[].include` | No | `Empty` | Array of glob patterns to include in the deployment package. When specified, only matching files are packaged. Falls back to global `include` if not set. Add `".*"` to include hidden files like `.env.production`. |
-| `servers[].ignore` | No | `[]` | Array of glob patterns to exclude from the deployment package. Applied after `include` patterns. Falls back to global `ignore` if not set. |
+| Option                  | Required | Default    | Description                                                                                                                                                                                                          |
+| ----------------------- | -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `servers[].distDir`     | Yes      | `"./dist"` | Directory where the content to package for deployment lives.                                                                                                                                                         |
+| `servers[].deployTo`    | Yes      |            | Base path **on the server** where deployments are stored. Bare Deploy creates a `releases/` subfolder with timestamped versions.                                                                                     |
+| `servers[].webroot`     | No       | `Empty`    | Path to the web server's document root. On first deploy, backs up existing `webroot` to `{webroot}.bak` and creates a symlink. Automatically copies `.well-known/` (Let's Encrypt) from the previous deployment.     |
+| `servers[].preScripts`  | No       | `[]`       | Array of commands to **run locally** before building the deployment package.                                                                                                                                         |
+| `servers[].postScripts` | No       | `[]`       | Array of commands to **run on the server** after deployment but before switching the symlink.                                                                                                                        |
+| `servers[].startScript` | No       | `Empty`    | Command to run after symlink switch. Useful for process managers like PM2.                                                                                                                                           |
+| `servers[].include`     | No       | `Empty`    | Array of glob patterns to include in the deployment package. When specified, only matching files are packaged. Falls back to global `include` if not set. Add `".*"` to include hidden files like `.env.production`. |
+| `servers[].ignore`      | No       | `[]`       | Array of glob patterns to exclude from the deployment package. Applied after `include` patterns. Falls back to global `ignore` if not set.                                                                           |
 
 ### Global Options
 
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `include` | No | `[]` | Array of glob patterns to include in the deployment package. Used as fallback when not defined per-server. |
-| `ignore` | No | `[".git/*"]` | Array of glob patterns to exclude from the deployment package. Used as fallback when not defined per-server. |
-| `keepReleases` | No | `5` | Number of releases to keep on the server as history. |
-| `healthCheck` | No | `{}` | Runs after all deploy steps to validate the deployment. If it fails, the deploy is automatically rolled back. Accepts `url` (URL to check) and `timeout` (seconds to wait, default `15`). |
-| `healthCheck.url` | `Empty` | The URL to check after deployment. |
-| `healthCheck.timeout` | `15` | Seconds to wait for the health check to succeed. |
+| Option                | Required | Default                                          | Description                                                                                                                                                                               |
+| --------------------- | -------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `include`             | No       | `[]`                                             | Array of glob patterns to include in the deployment package. Used as fallback when not defined per-server.                                                                                |
+| `ignore`              | No       | `[".git/*"]`                                     | Array of glob patterns to exclude from the deployment package. Used as fallback when not defined per-server.                                                                              |
+| `keepReleases`        | No       | `5`                                              | Number of releases to keep on the server as history.                                                                                                                                      |
+| `healthCheck`         | No       | `{}`                                             | Runs after all deploy steps to validate the deployment. If it fails, the deploy is automatically rolled back. Accepts `url` (URL to check) and `timeout` (seconds to wait, default `15`). |
+| `healthCheck.url`     | `Empty`  | The URL to check after deployment.               |
+| `healthCheck.timeout` | `15`     | Seconds to wait for the health check to succeed. |
 
 ---
 

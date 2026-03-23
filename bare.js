@@ -283,9 +283,29 @@ function bumpVersion(pkg, type = "patch") {
   return newVersion;
 }
 
+function loadGitignore(cwd = process.cwd()) {
+  const gitignorePath = path.join(cwd, ".gitignore");
+
+  if (!fs.existsSync(gitignorePath)) {
+    return [];
+  }
+
+  const content = fs.readFileSync(gitignorePath, "utf-8");
+  const patterns = content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+
+  return patterns;
+}
+
 function buildZipCommand(distDir, archive, config) {
   const includePatterns = config.include || [];
   const ignorePatterns = config.ignore || [".git/*"];
+  const distDirNormalized = distDir.replace(/^\.\//, "");
+  const gitignorePatterns = (config.gitignore || []).filter(
+    (pattern) => !pattern.startsWith(distDirNormalized),
+  );
   const archivePath = distDir === "./" ? `./${archive}` : `../${archive}`;
 
   let zipCmd = `cd ${distDir} && zip -r ${archivePath}`;
@@ -298,9 +318,10 @@ function buildZipCommand(distDir, archive, config) {
     zipCmd += ` .`;
   }
 
-  if (ignorePatterns.length > 0) {
+  const allIgnorePatterns = [...ignorePatterns, ...gitignorePatterns];
+  if (allIgnorePatterns.length > 0) {
     // If ignore patterns are specified, attempt to exclude these
-    const excludes = ignorePatterns.map((pattern) => `-x '${pattern}'`).join(" ");
+    const excludes = allIgnorePatterns.map((pattern) => `-x '${pattern}'`).join(" ");
     zipCmd += ` ${excludes}`;
   }
 
@@ -343,6 +364,8 @@ async function deploy() {
   const version = newVersion;
   const releaseId = `${generateReleaseId()}-${version}`;
 
+  const gitignorePatterns = loadGitignore();
+
   const deployToServer = async (server) => {
     log("info", `Server: ${server.host}`);
 
@@ -361,6 +384,7 @@ async function deploy() {
     const serverConfig = {
       include: server.include ?? config.include ?? [],
       ignore: server.ignore ?? config.ignore ?? [".git/*"],
+      gitignore: gitignorePatterns,
     };
 
     const zipCommand = buildZipCommand(distDir, archive, serverConfig);
@@ -1111,4 +1135,5 @@ export {
   init,
   isNewerVersion,
   checkForUpdate,
+  loadGitignore,
 };

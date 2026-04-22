@@ -37,7 +37,9 @@ function loadPkg() {
   const pkgPath = path.join(process.cwd(), "package.json");
 
   if (!fs.existsSync(pkgPath)) {
-    throw new Error("\nFile 'package.json' not found.\nRun in a project directory that contains a 'package.json' file.\n");
+    throw new Error(
+      "\nFile 'package.json' not found.\nRun in a project directory that contains a 'package.json' file.\n",
+    );
   }
 
   return JSON.parse(fs.readFileSync(pkgPath));
@@ -303,9 +305,7 @@ function buildZipCommand(distDir, archive, config) {
   const includePatterns = config.include || [];
   const ignorePatterns = config.ignore || [".git/*"];
   const distDirNormalized = distDir.replace(/^\.\//, "");
-  const gitignorePatterns = (config.gitignore || []).filter(
-    (pattern) => !pattern.startsWith(distDirNormalized),
-  );
+  const gitignorePatterns = (config.gitignore || []).filter((pattern) => !pattern.startsWith(distDirNormalized));
   const archivePath = distDir === "./" ? `./${archive}` : `../${archive}`;
 
   let zipCmd = `cd ${distDir} && zip -r ${archivePath}`;
@@ -495,7 +495,7 @@ async function deploy() {
         } catch (err) {
           const cleanError = new Error(
             `Failed to create webroot symlink. The deploy user needs write permissions on the webroot directory. ` +
-            `Add the deploy user to the www-data group: 'sudo usermod -a -G www-data ${server.user}'`,
+              `Add the deploy user to the www-data group: 'sudo usermod -a -G www-data ${server.user}'`,
           );
 
           cleanError.host = server.host;
@@ -706,7 +706,11 @@ function listReleases() {
       );
 
       const currentRelease = runSSH(server, `readlink ${server.deployTo}/releases/current 2>/dev/null || echo ""`, "");
-      const previousRelease = runSSH(server, `readlink ${server.deployTo}/releases/previous 2>/dev/null || echo ""`, "");
+      const previousRelease = runSSH(
+        server,
+        `readlink ${server.deployTo}/releases/previous 2>/dev/null || echo ""`,
+        "",
+      );
 
       if (releases === "No releases found") {
         log("info", `No releases found on ${server.host}!\nRun 'bare deploy' to deploy the first one.`);
@@ -820,7 +824,7 @@ async function use(version) {
         } catch (err) {
           const cleanError = new Error(
             `Failed to update webroot symlink. The deploy user needs write permissions on the webroot directory. ` +
-            `Add the deploy user to the www-data group: 'sudo usermod -a -G www-data ${server.user}'`,
+              `Add the deploy user to the www-data group: 'sudo usermod -a -G www-data ${server.user}'`,
           );
 
           cleanError.host = server.host;
@@ -1082,12 +1086,15 @@ async function checkForUpdate() {
       case "help":
       default:
         const cliVersion = getCliVersion();
-        log("info", `
- ██████   █████  ██████  ███████
- ██   ██ ██   ██ ██   ██ ██
- ██████  ███████ ██████  █████
- ██   ██ ██   ██ ██   ██ ██
- ██████  ██   ██ ██   ██ ███████
+        log(
+          "info",
+          `
+ ██████╗  █████╗ ██████╗ ███████╗
+ ██╔══██╗██╔══██╗██╔══██╗██╔════╝
+ ██████╔╝███████║██████╔╝███████╗
+ ██╔══██╗██╔══██╗██╔══██╗██╔════╝
+ ██████╔╝██╔══██╗██╔══██╗███████╗
+ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
  Deploy tool by Abtz Labs (v${cliVersion})
 
 Commands:
@@ -1107,7 +1114,8 @@ Options:
   --major           Bump major version
 
 For full documentation, visit: https://github.com/abtz-labs/bare
-        `);
+        `,
+        );
     }
   } catch (err) {
     log("error", err.message);

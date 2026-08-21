@@ -396,6 +396,7 @@ async function deploy() {
     const lockFile = `${base}/.bare-deploy.lock`;
 
     let previousReleaseForRollback;
+    let webrootBackedUp = false;
 
     log("info", "Deploying...");
 
@@ -408,16 +409,17 @@ async function deploy() {
       runSSH(server, `mkdir -p ${releaseDir}`, "Creating release directory");
 
       if (server.webroot) {
-        // Handle webroot migration (first deploy: if webroot is a directory, backup it)
+        // Handle webroot migration (first deploy: if webroot is a real directory, backup it)
         const isDir = runSSH(
           server,
-          `[ -d "${server.webroot}" ] && echo "dir" || echo "not-dir"`,
+          `[ -d "${server.webroot}" ] && [ ! -L "${server.webroot}" ] && echo "dir" || echo "not-dir"`,
           "Checking webroot type",
         );
 
         if (isDir === "dir") {
           try {
             runSSH(server, `mv "${server.webroot}" "${server.webroot}.bak"`, "Backing up original webroot");
+            webrootBackedUp = true;
           } catch (err) {
             const cleanError = new Error(
               `Failed to backup webroot directory. The deploy user needs write permissions on the webroot directory. ` +
@@ -481,9 +483,11 @@ async function deploy() {
       // Update symlink BEFORE running post-scripts so they operate on the new release
       runSSH(server, `ln -sfn ${releaseDir} ${releaseBase}/current`, "Activating new release...");
 
-      // Create previous symlink if there was a previous release
+      // Create previous symlink
       if (previousReleaseForRollback && previousReleaseForRollback.trim() !== "") {
         runSSH(server, `ln -sfn ${previousReleaseForRollback} ${releaseBase}/previous`, "Creating previous symlink...");
+      } else if (webrootBackedUp) {
+        runSSH(server, `ln -sfn ${server.webroot}.bak ${releaseBase}/previous`, "Creating previous symlink to backup...");
       }
 
       // Create webroot symlink if configured
@@ -633,6 +637,17 @@ async function deploy() {
               log("success", "Rollback completed.");
             }
           }
+        }
+
+        // Restore webroot from backup on first deploy failure
+        if (server.webroot && webrootBackedUp) {
+          runSSH(server, `rm -f "${server.webroot}"`, "Removing dangling webroot symlink...");
+          runSSH(
+            server,
+            `mv "${server.webroot}.bak" "${server.webroot}"`,
+            "Restoring webroot from backup...",
+          );
+          runSSH(server, `rm -f ${releaseBase}/previous`, "Removing previous symlink...");
         }
 
         // Clean up failed release directory

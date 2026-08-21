@@ -146,7 +146,7 @@ Each server in the `servers` array can have its own configuration:
 | ----------------------- | -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `servers[].distDir`     | Yes      | `"./dist"` | Directory where the content to package for deployment lives.                                                                                                                                                         |
 | `servers[].deployTo`    | Yes      |            | Base path **on the server** where deployments are stored. Bare Deploy creates a `releases/` subfolder with timestamped versions.                                                                                     |
-| `servers[].webroot`     | No       | `Empty`    | Path to the web server's document root. On first deploy, backs up existing `webroot` to `{webroot}.bak` and creates a symlink. Automatically copies `.well-known/` (Let's Encrypt) from the previous deployment.     |
+| `servers[].webroot`     | No       | `Empty`    | Path to the web server's document root. On first deploy, backs up the existing directory to `{webroot}.bak` and replaces it with a symlink to `releases/current`. If first deploy fails, the backup is automatically restored. Copies `.well-known/` (Let's Encrypt) from the previous deployment. |
 | `servers[].preScripts`  | No       | `[]`       | Array of commands to **run locally** before building the deployment package.                                                                                                                                         |
 | `servers[].postScripts` | No       | `[]`       | Array of commands to **run on the server** after deployment but before switching the symlink.                                                                                                                        |
 | `servers[].startScript` | No       | `Empty`    | Command to run after symlink switch. Useful for process managers like PM2.                                                                                                                                           |
@@ -210,12 +210,18 @@ bare rollback [id]
 
 ### Symlinks
 
-Bare Deploy manages three symlinks in your releases directory:
+Bare Deploy manages symlinks in your releases directory:
 
 - `current` - Points to the active release
 - `previous` - Points to the previous release (one version before current)
 
-After each deploy:
+After the first deploy (with `webroot`):
+
+- `current` → new release
+- `previous` → `{webroot}.bak` (the original directory before Bare took over)
+- `{webroot}` → `releases/current`
+
+After subsequent deploys:
 
 - `current` → new release
 - `previous` → previous release (what `current` was before)

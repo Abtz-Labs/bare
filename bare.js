@@ -81,6 +81,7 @@ const options = {
   queryVersion: args.includes("--version") || args.includes("-v"),
   verbose: args.includes("--verbose") || args.includes("--debug"),
   versionBump: args.includes("--major") ? "major" : args.includes("--minor") ? "minor" : "patch",
+  noBump: args.includes("--no-bump"),
 };
 
 // ------------------------------
@@ -352,16 +353,34 @@ async function deploy() {
   const pkg = loadPkg();
   const startTime = Date.now();
   const originalVersion = pkg.version;
-  const newVersion = bumpVersion(pkg, options.versionBump);
 
-  if (!options.dryRun) {
-    const pkgPath = path.join(process.cwd(), "package.json");
+  let shouldBump = !options.noBump;
 
-    pkg.version = newVersion;
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+  // Auto-detect first deploy: check if any server has existing releases
+  if (shouldBump && !options.dryRun) {
+    const hasReleases = config.servers.some((server) => {
+      const result = runSSH(
+        server,
+        `ls -1 ${server.deployTo}/releases 2>/dev/null | grep -v '^current$' | grep -v '^previous$' | head -1`,
+        "Checking for existing releases...",
+      );
+      return result && result.trim() !== "";
+    });
+
+    if (!hasReleases) {
+      shouldBump = false;
+      log("info", "First deploy detected. Skipping version bump.");
+    }
   }
 
-  const version = newVersion;
+  const version = shouldBump ? bumpVersion(pkg, options.versionBump) : originalVersion;
+
+  if (shouldBump && !options.dryRun) {
+    const pkgPath = path.join(process.cwd(), "package.json");
+
+    pkg.version = version;
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+  }
   const releaseId = `${generateReleaseId()}-${version}`;
 
   const gitignorePatterns = loadGitignore();
@@ -1124,6 +1143,7 @@ Options:
   --json            JSON logging
   --verbose         Show detailed operation info
   --sequential      Deploy server-by-server
+  --no-bump         Skip version bump
   --patch           Bump patch version (default)
   --minor           Bump minor version
   --major           Bump major version

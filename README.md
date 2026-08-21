@@ -179,6 +179,7 @@ bare deploy [options]
   --json            JSON logging
   --verbose         Show detailed operation info
   --sequential      Deploy server-by-server
+  --no-bump         Skip version bump
   --patch           Bump patch version (default)
   --minor           Bump minor version
   --major           Bump major version
@@ -186,7 +187,7 @@ bare deploy [options]
 
 ### How It Works
 
-- Bumps `package.json` version.
+- Bumps `package.json` version (skipped automatically on first deploy, or with `--no-bump`).
 - Runs local pre-deploy scripts.
 - Creates build artifact.
 - Acquires lock.

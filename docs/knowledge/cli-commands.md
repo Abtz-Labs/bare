@@ -29,6 +29,7 @@ node bare.js [command] [options]
 | `--dry-run` | Simulate execution |
 | `--json` | JSON logging |
 | `--sequential` | Deploy server-by-server |
+| `--no-bump` | Skip version bump |
 | `--patch` (default) | Version bump type |
 | `--minor` | Version bump type |
 | `--major` | Version bump type |

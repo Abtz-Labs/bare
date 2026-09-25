@@ -74,7 +74,8 @@ describe("CLI commands", () => {
 
         expect(fs.existsSync("bare.config.json")).toBe(true);
         const config = JSON.parse(fs.readFileSync("bare.config.json"));
-        expect(config.servers).toBeDefined();
+        expect(config.host).toBe("your-server.com");
+        expect(config.deployTo).toBe("/var/www/app");
       } finally {
         process.chdir(currentDir);
         fs.rmSync(testInitDir, { recursive: true, force: true });

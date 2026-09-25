@@ -54,6 +54,16 @@ function loadConfig() {
 
   const config = JSON.parse(fs.readFileSync(file));
 
+  // Single-server shorthand: server fields at the top level, `servers` omitted.
+  if (!config.servers) {
+    const server = { ...config };
+
+    delete server.keepReleases;
+    delete server.healthCheck;
+
+    config.servers = [server];
+  }
+
   for (const server of config.servers) {
     if (server.deployTo && !path.isAbsolute(server.deployTo)) {
       throw new Error(`\nAttribute 'deployTo' must be an absolute path, got: ${server.deployTo}\n`);
@@ -944,26 +954,16 @@ function init() {
   }
 
   const defaultConfig = {
-    servers: [
-      {
-        host: "your-server.com",
-        user: "deploy",
-        port: 22,
-        identityFile: "~/.ssh/id_rsa",
-        distDir: "./dist",
-        deployTo: "/var/www/app",
-        webroot: "",
-        type: "node",
-        include: [],
-        ignore: [],
-        preScripts: [],
-        postScripts: [],
-        startScript: "pm2 restart --env production --update-env",
-      },
-    ],
+    host: "your-server.com",
+    user: "deploy",
+    port: 22,
+    identityFile: "~/.ssh/id_rsa",
+    distDir: "./dist",
+    deployTo: "/var/www/app",
+    webroot: "",
+    type: "node",
+    startScript: "pm2 restart --env production --update-env",
     keepReleases: 5,
-    include: [],
-    ignore: [".git/*"],
     healthCheck: {
       url: "http://localhost:3000/health",
       timeout: 15,

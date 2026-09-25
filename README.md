@@ -77,26 +77,16 @@ The files it creates looks like this 👇
 
 ```json
 {
-  "servers": [
-    {
-      "host": "your-server.com",
-      "user": "deploy",
-      "port": 22,
-      "identityFile": "~/.ssh/id_rsa",
-      "distDir": "./dist",
-      "deployTo": "/var/www/app",
-      "webroot": "",
-      "type": "node",
-      "include": [],
-      "ignore": [".git/*"],
-      "preScripts": [],
-      "postScripts": [],
-      "startScript": "pm2 restart --env production --update-env"
-    }
-  ],
+  "host": "your-server.com",
+  "user": "deploy",
+  "port": 22,
+  "identityFile": "~/.ssh/id_rsa",
+  "distDir": "./dist",
+  "deployTo": "/var/www/app",
+  "webroot": "",
+  "type": "node",
+  "startScript": "pm2 restart --env production --update-env",
   "keepReleases": 5,
-  "include": [],
-  "ignore": [".git/*"],
   "healthCheck": {
     "url": "http://localhost:3000/health",
     "timeout": 15
@@ -105,7 +95,10 @@ The files it creates looks like this 👇
 ```
 
 > [!NOTE]
-> Server-specific options (`distDir`, `deployTo`, `webroot`, `include`, `ignore`, `preScripts`, `postScripts`, `startScript`) allow deploying different parts of your project to different servers.
+> A single server can be configured at the top level, as above. To deploy to multiple servers, use a
+> `servers` array instead; each entry accepts the server-specific options (`host`, `user`, `port`,
+> `identityFile`, `distDir`, `deployTo`, `webroot`, `type`, `include`, `ignore`, `preScripts`,
+> `postScripts`, `startScript`) and can differ per server.
 
 > [!NOTE]
 > When running `bare init`:
@@ -118,9 +111,10 @@ The files it creates looks like this 👇
 
 ## Configuration Options
 
-### Server-Specific Options
+### Server Options
 
-Each server in the `servers` array can have its own configuration:
+For a single server, put these fields at the top level (see [Quick Start](#quick-start)). For multiple
+servers, use the `servers` array — each entry can have its own configuration:
 
 ```json
 {

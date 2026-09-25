@@ -17,3 +17,11 @@
 - Added `servers[].type` (`"node"` | `"php"`). `"php"` writes `.user.ini` (`opcache.revalidate_path=1`) via `buildPhpUserIniCommand()` after extraction, before the symlink switch. Tests: `tests/unit/deploy-php.test.js`. All 74 tests pass.
 - Fixed README: `postScripts`/`startScript` run AFTER the symlink switch (was documented as before).
 - Plan: `docs/plans/2026-09-25-php-opcache-deployments.md`.
+
+## Session 2026-09-25 — Config simplification
+
+- `loadConfig` now accepts a single-server shorthand: server fields at the top level with `servers` omitted. It normalizes to `config.servers = [server]`, excluding `keepReleases` and `healthCheck` (which stay global).
+- `bare init` now emits the minimal flat shorthand: no empty `include`/`ignore`/`preScripts`/`postScripts`, no global `include`/`ignore`.
+- The only true schema duplication was `include`/`ignore` (per-server falls back to global). Kept as-is.
+- Tests: `tests/unit/config.test.js` (new); updated `tests/unit/init.test.js` and `tests/integration/cli.test.js`. All 80 tests pass.
+- Plan: `docs/plans/2026-09-25-config-shorthand.md`.

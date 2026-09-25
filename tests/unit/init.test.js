@@ -82,8 +82,22 @@ describe("init", () => {
     const configPath = path.join(testDir, "bare.config.json");
     const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 
-    expect(config.servers).toHaveLength(1);
+    expect(config.host).toBe("your-server.com");
+    expect(config.deployTo).toBe("/var/www/app");
     expect(config.keepReleases).toBe(5);
     expect(config.healthCheck.url).toBe("http://localhost:3000/health");
+  });
+
+  it("omits empty optional fields from the default config", () => {
+    init();
+
+    const configPath = path.join(testDir, "bare.config.json");
+    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+
+    expect(config.servers).toBeUndefined();
+    expect(config.include).toBeUndefined();
+    expect(config.ignore).toBeUndefined();
+    expect(config.preScripts).toBeUndefined();
+    expect(config.postScripts).toBeUndefined();
   });
 });

@@ -24,4 +24,7 @@
 - `bare init` now emits the minimal flat shorthand: no empty `include`/`ignore`/`preScripts`/`postScripts`, no global `include`/`ignore`.
 - The only true schema duplication was `include`/`ignore` (per-server falls back to global). Kept as-is.
 - Tests: `tests/unit/config.test.js` (new); updated `tests/unit/init.test.js` and `tests/integration/cli.test.js`. All 80 tests pass.
+- Removed the repo's own `bare.config.json` (gitignored/npmignored, unreferenced).
+- Version bumped to `1.4.0` (also synced `package-lock.json`, which had drifted at `1.0.0`).
+- Static sites need no code: `type` only gates the PHP step (`bare.js:518`), so they omit `type` and `startScript`. Documented in README "Deploying Static Sites" (chose docs-only over a no-op `type: "static"`).
 - Plan: `docs/plans/2026-09-25-config-shorthand.md`.

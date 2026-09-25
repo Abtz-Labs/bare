@@ -143,7 +143,7 @@ servers, use the `servers` array — each entry can have its own configuration:
 | `servers[].distDir`     | Yes      | `"./dist"` | Directory where the content to package for deployment lives.                                                                                                                                                         |
 | `servers[].deployTo`    | Yes      |            | Base path **on the server** where deployments are stored. Bare Deploy creates a `releases/` subfolder with timestamped versions.                                                                                     |
 | `servers[].webroot`     | No       | `Empty`    | Path to the web server's document root. On first deploy, backs up the existing directory to `{webroot}.bak` and replaces it with a symlink to `releases/current`. If first deploy fails, the backup is automatically restored. Copies `.well-known/` (Let's Encrypt) from the previous deployment. |
-| `servers[].type`        | No       | `"node"`   | Application type: `"node"` or `"php"`. With `"php"`, Bare ensures `opcache.revalidate_path=1` in the release's `.user.ini` so OPcache follows the `current` symlink. See [Deploying PHP Applications](#deploying-php-applications).                                                                                                                          |
+| `servers[].type`        | No       | `"node"`   | Application type: `"node"` or `"php"`. With `"php"`, Bare ensures `opcache.revalidate_path=1` in the release's `.user.ini` so OPcache follows the `current` symlink. Static sites omit `type`. See [Deploying PHP Applications](#deploying-php-applications).                                                                                                                          |
 | `servers[].preScripts`  | No       | `[]`       | Array of commands to **run locally** before building the deployment package.                                                                                                                                         |
 | `servers[].postScripts` | No       | `[]`       | Array of commands to **run on the server** after the new release is activated (symlink switched) and before the start script.                                                                                        |
 | `servers[].startScript` | No       | `Empty`    | Command to run after symlink switch. Useful for process managers like PM2.                                                                                                                                           |
@@ -258,6 +258,39 @@ opcache.revalidate_path=1
 > [!WARNING]
 > Avoid reloading PHP-FPM on every deploy. It drops in-flight requests and is unnecessary once OPcache
 > revalidation is configured.
+
+---
+
+## Deploying Static Sites
+
+Static sites have no runtime, so they need no `type` and no `startScript`. Set `distDir` to your build
+output and let Bare handle the atomic symlink switch:
+
+```json
+{
+  "host": "your-server.com",
+  "user": "deploy",
+  "distDir": "./dist",
+  "deployTo": "/var/www/site",
+  "webroot": "/var/www/site/public_html",
+  "keepReleases": 5,
+  "healthCheck": {
+    "url": "https://site.com",
+    "timeout": 15
+  }
+}
+```
+
+> [!NOTE]
+> Remove the default `startScript` (`pm2 ...`) that `bare init` generates — it is only needed for
+> long-running processes.
+
+Serve the release in one of two ways:
+
+- **With `webroot`** (above): Bare replaces the served directory with a symlink to `releases/current`,
+  backing up the original to `{webroot}.bak` on first deploy.
+- **Without `webroot`**: point your web server's document root directly at
+  `<deployTo>/releases/current`. Nginx and Apache follow the symlink, so the swap stays atomic.
 
 ---
 

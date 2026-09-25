@@ -62,6 +62,10 @@ function loadConfig() {
     if (server.webroot && server.webroot.trim() && !path.isAbsolute(server.webroot)) {
       throw new Error(`\nAttribute 'webroot' must be an absolute path, got: ${server.webroot}\n`);
     }
+
+    if (server.type && !["node", "php"].includes(server.type)) {
+      throw new Error(`\nAttribute 'type' must be one of 'node', 'php', got: ${server.type}\n`);
+    }
   }
 
   return config;
@@ -344,6 +348,14 @@ function copyWellKnown(server, sourceDir, targetDir) {
   }
 }
 
+const PHP_OPCACHE_REVALIDATE = "opcache.revalidate_path=1";
+
+function buildPhpUserIniCommand(releaseDir) {
+  const iniFile = `${releaseDir}/.user.ini`;
+
+  return `touch "${iniFile}"; grep -qxF '${PHP_OPCACHE_REVALIDATE}' "${iniFile}" || echo '${PHP_OPCACHE_REVALIDATE}' >> "${iniFile}"`;
+}
+
 // ------------------------------
 // DEPLOY
 // ------------------------------
@@ -490,6 +502,11 @@ async function deploy() {
           // First deploy: copy from backup
           copyWellKnown(server, `${server.webroot}.bak`, releaseDir);
         }
+      }
+
+      // PHP: make OPcache re-resolve symlinks so new releases are picked up without FPM restart
+      if (server.type === "php") {
+        runSSH(server, buildPhpUserIniCommand(releaseDir), "Configuring PHP OPcache revalidation (.user.ini)");
       }
 
       // Capture previous release for potential rollback - BEFORE creating new symlink
@@ -936,6 +953,7 @@ function init() {
         distDir: "./dist",
         deployTo: "/var/www/app",
         webroot: "",
+        type: "node",
         include: [],
         ignore: [],
         preScripts: [],
@@ -1179,4 +1197,5 @@ export {
   isNewerVersion,
   checkForUpdate,
   loadGitignore,
+  buildPhpUserIniCommand,
 };

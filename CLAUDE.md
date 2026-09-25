@@ -13,6 +13,7 @@ This document is the table of contents for Bare Deploy agent guidelines.
 | Logging with JSON support | [logging.md](knowledge/logging.md) |
 | Async/await patterns | [async-patterns.md](knowledge/async-patterns.md) |
 | Configuration file guidelines | [configuration.md](knowledge/configuration.md) |
+| PHP deployments, OPcache | [php-deployments.md](knowledge/php-deployments.md) |
 | SSH and security guidelines | [ssh-security.md](knowledge/ssh-security.md) |
 | Performance guidelines | [performance.md](knowledge/performance.md) |
 | Testing guidelines | [testing.md](knowledge/testing.md) |

@@ -86,6 +86,7 @@ The files it creates looks like this 👇
       "distDir": "./dist",
       "deployTo": "/var/www/app",
       "webroot": "",
+      "type": "node",
       "include": [],
       "ignore": [".git/*"],
       "preScripts": [],
@@ -132,6 +133,7 @@ Each server in the `servers` array can have its own configuration:
       "distDir": "./dist",
       "deployTo": "/var/www/app",
       "webroot": "/var/www/app/public_html",
+      "type": "node",
       "preScripts": [],
       "postScripts": [],
       "startScript": "pm2 restart --env production --update-env"
@@ -147,8 +149,9 @@ Each server in the `servers` array can have its own configuration:
 | `servers[].distDir`     | Yes      | `"./dist"` | Directory where the content to package for deployment lives.                                                                                                                                                         |
 | `servers[].deployTo`    | Yes      |            | Base path **on the server** where deployments are stored. Bare Deploy creates a `releases/` subfolder with timestamped versions.                                                                                     |
 | `servers[].webroot`     | No       | `Empty`    | Path to the web server's document root. On first deploy, backs up the existing directory to `{webroot}.bak` and replaces it with a symlink to `releases/current`. If first deploy fails, the backup is automatically restored. Copies `.well-known/` (Let's Encrypt) from the previous deployment. |
+| `servers[].type`        | No       | `"node"`   | Application type: `"node"` or `"php"`. With `"php"`, Bare ensures `opcache.revalidate_path=1` in the release's `.user.ini` so OPcache follows the `current` symlink. See [Deploying PHP Applications](#deploying-php-applications).                                                                                                                          |
 | `servers[].preScripts`  | No       | `[]`       | Array of commands to **run locally** before building the deployment package.                                                                                                                                         |
-| `servers[].postScripts` | No       | `[]`       | Array of commands to **run on the server** after deployment but before switching the symlink.                                                                                                                        |
+| `servers[].postScripts` | No       | `[]`       | Array of commands to **run on the server** after the new release is activated (symlink switched) and before the start script.                                                                                        |
 | `servers[].startScript` | No       | `Empty`    | Command to run after symlink switch. Useful for process managers like PM2.                                                                                                                                           |
 | `servers[].include`     | No       | `Empty`    | Array of glob patterns to include in the deployment package. When specified, only matching files are packaged. Falls back to global `include` if not set. Add `".*"` to include hidden files like `.env.production`. |
 | `servers[].ignore`      | No       | `[]`       | Array of glob patterns to exclude from the deployment package. Applied after `include` patterns. Falls back to global `ignore` if not set.                                                                           |
@@ -193,11 +196,74 @@ bare deploy [options]
 - Acquires lock.
 - SCPs package to server.
 - Extracts into timestamped release directory.
-- Executes post-deploy scripts.
+- Configures `.user.ini` for `type: "php"` (see [Deploying PHP Applications](#deploying-php-applications)).
 - Atomically switches current symlink.
+- Runs post-deploy scripts.
+- Runs the start script, when set.
 - Optionally validates health endpoint.
 - Releases lock.
 - Rollback, when needed. Simply re-points the symlink.
+
+---
+
+## Deploying PHP Applications
+
+Bare works with PHP apps. Set `type` to `"php"` on the server:
+
+```json
+{
+  "servers": [
+    {
+      "host": "server.com",
+      "user": "deploy",
+      "deployTo": "/home/user/web/example.com",
+      "webroot": "/home/user/web/example.com/public_html",
+      "type": "php"
+    }
+  ]
+}
+```
+
+### The OPcache + symlink problem
+
+PHP's OPcache compiles a script once and reuses the bytecode. Because Bare serves apps through a
+`public_html → releases/current → releases/<id>` symlink, PHP can keep serving the **old** release
+after `current` is repointed. `opcache.validate_timestamps` does not help: the old release directory
+still exists, so the cached file looks unchanged.
+
+With `type: "php"`, Bare writes this line to `.user.ini` in each release (after extraction, before the
+symlink switch):
+
+```ini
+opcache.revalidate_path=1
+```
+
+This makes OPcache re-resolve symlinks on every deploy, so the new release is picked up without
+restarting PHP-FPM.
+
+> [!NOTE]
+> `.user.ini` requires PHP-FPM and `user_ini.filename` enabled (the default). It is first read within
+> `user_ini.cache_ttl` (default 5 minutes), then stays in effect.
+
+### Server-wide alternative (recommended when you control the server)
+
+Add the same directive to your PHP-FPM pool or `php.ini`:
+
+```ini
+opcache.revalidate_path=1
+```
+
+### Other web servers
+
+- **Nginx + PHP-FPM** (no Apache): pass the resolved path instead of the symlink:
+  `fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;`
+- **Caddy**: enable `resolve_root_symlink` on the `php_fastcgi` directive.
+- **Apache (e.g. HestiaCP)**: `opcache.revalidate_path=1` is the equivalent fix; `type: "php"` applies
+  it per app.
+
+> [!WARNING]
+> Avoid reloading PHP-FPM on every deploy. It drops in-flight requests and is unnecessary once OPcache
+> revalidation is configured.
 
 ---
 
